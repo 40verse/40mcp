@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFile, unlink, mkdtemp } from 'node:fs/promises';
+import { writeFile, unlink, mkdtemp, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createConnection } from 'node:net';
@@ -62,7 +62,12 @@ describe('vault-daemon', {
   let noAuthConfigPath;
 
   before(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), '40mcp-daemon-test-'));
+    // On macOS, tmpdir() returns `/var/folders/...` but /var is a symlink to
+    // /private/var. The daemon canonicalizes configPaths via fs.realpath, so
+    // we must canonicalize our tmpDir at test setup too — otherwise the
+    // allowlist stores /var/... while the auth handler compares /private/var/...
+    // and every request is rejected. Linux has no such symlink.
+    tmpDir = await realpath(await mkdtemp(join(tmpdir(), '40mcp-daemon-test-')));
     vaultPath = join(tmpDir, 'vault.json');
     socketPath = join(tmpDir, 'daemon.sock');
     pidPath = join(tmpDir, 'daemon.pid');

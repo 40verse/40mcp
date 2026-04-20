@@ -5,7 +5,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +31,10 @@ function runCli(args, { env = {}, cwd } = {}) {
 describe('settings show — text output', () => {
   let work;
 
-  before(() => { work = mkdtempSync(join(tmpdir(), 'settings-show-')); });
+  // realpathSync: on macOS tmpdir() returns /var/folders/... but /var is a
+  // symlink to /private/var. The CLI canonicalizes the settings-file path in
+  // its output, so the path we embed in regex assertions must be canonical too.
+  before(() => { work = realpathSync(mkdtempSync(join(tmpdir(), 'settings-show-'))); });
   after(() => { try { rmSync(work, { recursive: true, force: true }); } catch {} });
 
   it('prints default tree with no settings file', async () => {

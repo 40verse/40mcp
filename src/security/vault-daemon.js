@@ -32,7 +32,7 @@ import { createServer, createConnection } from 'node:net';
 import { readFile, unlink, open, mkdir, chmod, realpath } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, dirname, resolve as resolvePath } from 'node:path';
+import { join, dirname, basename, resolve as resolvePath } from 'node:path';
 import { createVault, getDaemonInternals } from './vault.js';
 import { safeLog } from '../core/events.js';
 import { randomBytes, timingSafeEqual, signJWT, verifyJWT, DEFAULT_TOKEN_TTL } from './crypto.js';
@@ -133,10 +133,19 @@ export async function startDaemon({
     try {
       allowedConfigPathSet.add(await realpath(absolute));
     } catch {
-      // File may not yet exist at daemon startup — fall back to the
-      // resolved path. This preserves the "create then populate" workflow
-      // operators use in tests while still normalizing `.` / `..` segments.
-      allowedConfigPathSet.add(absolute);
+      // File may not yet exist at daemon startup — canonicalize the parent
+      // directory (which always exists; mkdir happened before this call in
+      // every real-world flow) and recompose. Without this step, macOS symlinks
+      // in the prefix (`/var` → `/private/var`, `/tmp` → `/private/tmp`) cause
+      // the allowlist to store a non-canonical path while the auth handler
+      // realpaths the incoming path to the canonical form — every request for
+      // a not-yet-existing config was rejected.
+      try {
+        const parentCanonical = await realpath(dirname(absolute));
+        allowedConfigPathSet.add(join(parentCanonical, basename(absolute)));
+      } catch {
+        allowedConfigPathSet.add(absolute);
+      }
     }
   }
   if (!trustWireConfigPath && allowedConfigPathSet.size === 0) {
