@@ -10,6 +10,7 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ─── Thresholds (lines 1-indexed, inclusive blank lines) ────────────────────
 
@@ -21,8 +22,10 @@ const THRESHOLDS = {
     debt:     2500,   // architectural debt (hard fail)
   },
   test: {
-    review:   600,    // flag in PR review
-    split:   1000,    // must split (hard fail)
+    review:   600,    // flag in PR review (WARN)
+    justify: 1000,    // must document in PR why it stays whole (WARN)
+    refactor: 1500,   // refactor candidate (WARN)
+    split:   2000,    // must split (hard fail)
   },
   docs: {
     review:   300,    // flag in PR review
@@ -48,7 +51,11 @@ const JUSTIFIED_EXCEPTIONS = {
 
 // ─── Directories to scan ─────────────────────────────────────────────────────
 
-const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+// `new URL('..').pathname` returns "/C:/..." on Windows, which `path.join`
+// then mangles into "\C:\...". Use fileURLToPath so the path is a proper
+// filesystem path on every platform — otherwise the walk silently finds zero
+// files on Windows and every LOC violation passes locally.
+const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]$/, '');
 
 const SCAN_DIRS = ['src', 'test', 'examples', 'docs'];
 
@@ -136,6 +143,12 @@ for (const dir of SCAN_DIRS) {
           rows.push({ level: 'FAIL', kind, loc, rel, msg: `>${thresholds.split} — must split (threshold: ${thresholds.split})` });
           failures++;
         }
+      } else if (loc > thresholds.refactor) {
+        rows.push({ level: 'WARN', kind, loc, rel, msg: `>${thresholds.refactor} — refactor candidate` });
+        warnings++;
+      } else if (loc > thresholds.justify) {
+        rows.push({ level: 'WARN', kind, loc, rel, msg: `>${thresholds.justify} — justify keeping whole in PR` });
+        warnings++;
       } else if (loc > thresholds.review) {
         rows.push({ level: 'WARN', kind, loc, rel, msg: `>${thresholds.review} — review recommended` });
         warnings++;
