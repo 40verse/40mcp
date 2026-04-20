@@ -37,6 +37,11 @@ describe('stdio transport', () => {
   });
 });
 
+// Use 127.0.0.1 (not localhost) in fetch URLs throughout this file. On Node 18
+// undici resolves "localhost" to ::1 (IPv6) by preference, but createSseTransport
+// binds to 127.0.0.1 (IPv4) by default — fetch would fail with a bare
+// "fetch failed" on the Node 18 CI leg. Node 20+ has Happy Eyeballs fallback
+// so localhost would work there; pin to the IPv4 literal for CI parity.
 describe('SSE transport', () => {
   it('createSseTransport starts HTTP server on specified port', async () => {
     const server = createTestServer();
@@ -60,7 +65,7 @@ describe('SSE transport', () => {
     try {
       const address = httpServer.address();
       const port = address.port;
-      const response = await fetch(`http://localhost:${port}/health`);
+      const response = await fetch(`http://127.0.0.1:${port}/health`);
 
       assert.equal(response.status, 200);
       const body = await response.json();
@@ -97,7 +102,7 @@ describe('SSE transport', () => {
       const port = address.port;
 
       // Health endpoint should still work
-      const response = await fetch(`http://localhost:${port}/health`);
+      const response = await fetch(`http://127.0.0.1:${port}/health`);
       assert.equal(response.status, 200);
     } finally {
       httpServer.close();
@@ -112,7 +117,7 @@ describe('SSE transport', () => {
       const address = httpServer.address();
       const port = address.port;
 
-      const response = await fetch(`http://localhost:${port}/unknown`);
+      const response = await fetch(`http://127.0.0.1:${port}/unknown`);
       assert.equal(response.status, 404);
     } finally {
       httpServer.close();
@@ -127,7 +132,7 @@ describe('SSE transport', () => {
       const address = httpServer.address();
       const port = address.port;
 
-      const response = await fetch(`http://localhost:${port}/health`, {
+      const response = await fetch(`http://127.0.0.1:${port}/health`, {
         method: 'OPTIONS',
       });
       assert.equal(response.status, 204);
