@@ -1,0 +1,79 @@
+{
+  "name": "github-stripe-compound",
+  "version": "1.0.0",
+  "servers": [
+    {
+      "name": "github",
+      "baseUrl": "https://api.github.com",
+      "auth": { "type": "bearer", "envVar": "GITHUB_TOKEN" }
+    },
+    {
+      "name": "stripe",
+      "baseUrl": "https://api.stripe.com/v1",
+      "auth": { "type": "bearer", "envVar": "STRIPE_SECRET_KEY" }
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_issue",
+      "description": "Fetch a GitHub issue by number.",
+      "server": "github",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/issues/:issue_number",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": { "type": "string", "description": "Repository owner" },
+          "repo": { "type": "string", "description": "Repository name" },
+          "issue_number": { "type": "integer", "description": "Issue number" }
+        },
+        "required": ["owner", "repo", "issue_number"]
+      }
+    },
+    {
+      "name": "get_customer",
+      "description": "Retrieve a Stripe customer by ID.",
+      "server": "stripe",
+      "method": "GET",
+      "path": "/customers/:customer_id",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": { "type": "string", "description": "Stripe customer ID (cus_...)" }
+        },
+        "required": ["customer_id"]
+      }
+    },
+    {
+      "name": "get_issue_with_payment_status",
+      "description": "Fetch a GitHub issue and look up the Stripe customer referenced in its body. The issue body must contain a line like 'stripe_customer: cus_xxx'.",
+      "chain": [
+        {
+          "call": "get_issue",
+          "as": "issue",
+          "args": {
+            "owner": "$args.owner",
+            "repo": "$args.repo",
+            "issue_number": "$args.issue_number"
+          }
+        },
+        {
+          "call": "get_customer",
+          "as": "customer",
+          "args": {
+            "customer_id": "$issue.body_stripe_customer_id"
+          }
+        }
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": { "type": "string", "description": "Repository owner" },
+          "repo": { "type": "string", "description": "Repository name" },
+          "issue_number": { "type": "integer", "description": "Issue number" }
+        },
+        "required": ["owner", "repo", "issue_number"]
+      }
+    }
+  ]
+}

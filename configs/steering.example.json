@@ -1,0 +1,93 @@
+{
+  "name": "steering-example",
+  "usage": {
+    "envVars": [
+      "EXAMPLE_API_BASE_URL"
+    ],
+    "envVarDescriptions": {
+      "EXAMPLE_API_BASE_URL": "Base URL of the example API gateway this config bridges, no trailing slash (e.g. 'https://api.example.com') — substituted into baseUrl."
+    },
+    "setup": "Example steering config \u2014 set EXAMPLE_API_BASE_URL to the base URL of the API gateway you are bridging. Copy and customize for your own API gateway."
+  },
+  "version": "0.1.0",
+  "baseUrl": "${EXAMPLE_API_BASE_URL}",
+  "description": "Example 40mcp config showing how to configure agent steering on tools. Demonstrates forced-inference writes (steering.write) and prehook/posthook instruction injection. Stateless \u2014 the MCP server transforms each call independently.",
+  "tools": [
+    {
+      "name": "memory_write",
+      "description": "Write a finding to persistent memory. Forced-inference: memory_type/confidence/importance are auto-injected as required fields.",
+      "method": "POST",
+      "path": "/v1/memory",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The finding to record"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "steering": {
+        "write": true,
+        "authority": "RESEARCHER",
+        "prehook": "Classify this write before committing. memory_type=correction makes the entry permanent; hypothesis gets a 14-day half-life. Use importance=1.0 for anything that steers future behavior.",
+        "posthook": {
+          "instructions": "After the write lands, call mem_release on any related handles with outcome='persisted'. If memory_type=correction, also append it to the session chain with chain_append.",
+          "only_if_classified": true
+        }
+      }
+    },
+    {
+      "name": "ticket_create",
+      "description": "Open a support ticket. Prehook reminds the agent to capture context; posthook tells it to link the ticket to the current handle.",
+      "method": "POST",
+      "path": "/v1/tickets",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "body"
+        ]
+      },
+      "steering": {
+        "prehook": "Before opening a ticket, verify the issue is reproducible and include a minimal repro in the body.",
+        "posthook": "Now link the returned ticket_id to the current coordination handle via mem_release(handleId, outcome='escalated', note=ticket_id)."
+      }
+    },
+    {
+      "name": "search_knowledge",
+      "description": "Read-only search. No steering \u2014 searches don't mutate memory.",
+      "method": "GET",
+      "path": "/v1/knowledge",
+      "queryMap": {
+        "query": "q",
+        "limit": "limit"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  ]
+}

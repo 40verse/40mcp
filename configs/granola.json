@@ -1,0 +1,161 @@
+{
+  "name": "granola",
+  "usage": {
+    "envVars": [
+      "GRANOLA_API_KEY"
+    ],
+    "setup": "Obtain an API key from your Granola account settings."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.granola.so/v1",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "GRANOLA_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "list_meetings",
+      "description": "List recent meetings from Granola with AI-generated notes and summaries.",
+      "method": "GET",
+      "path": "/meetings",
+      "queryMap": {
+        "limit": "limit",
+        "offset": "offset",
+        "from": "from",
+        "to": "to"
+      },
+      "response": {
+        "pick": [
+          "meetings",
+          "total"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max meetings to return (default 25)"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Pagination offset"
+          },
+          "from": {
+            "type": "string",
+            "description": "Start date filter (ISO 8601)"
+          },
+          "to": {
+            "type": "string",
+            "description": "End date filter (ISO 8601)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_meeting",
+      "description": "Retrieve a specific Granola meeting with full notes, transcript summary, and action items.",
+      "method": "GET",
+      "path": "/meetings/:meeting_id",
+      "response": {
+        "tokenBudget": 5000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meeting_id": {
+            "type": "string",
+            "description": "Granola meeting ID"
+          }
+        },
+        "required": [
+          "meeting_id"
+        ]
+      }
+    },
+    {
+      "name": "search_meetings",
+      "description": "Search Granola meeting notes by keyword or topic.",
+      "method": "GET",
+      "path": "/meetings/search",
+      "queryMap": {
+        "q": "q",
+        "limit": "limit"
+      },
+      "response": {
+        "pick": [
+          "results",
+          "total"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Search query across meeting notes and transcripts"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results to return"
+          }
+        },
+        "required": [
+          "q"
+        ]
+      }
+    },
+    {
+      "name": "get_meeting_action_items",
+      "description": "Retrieve AI-extracted action items from a Granola meeting.",
+      "method": "GET",
+      "path": "/meetings/:meeting_id/action-items",
+      "response": {
+        "pick": [
+          "action_items"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meeting_id": {
+            "type": "string",
+            "description": "Granola meeting ID"
+          }
+        },
+        "required": [
+          "meeting_id"
+        ]
+      }
+    },
+    {
+      "name": "get_meeting_summary",
+      "description": "Get the AI-generated summary for a Granola meeting.",
+      "method": "GET",
+      "path": "/meetings/:meeting_id/summary",
+      "response": {
+        "tokenBudget": 2000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meeting_id": {
+            "type": "string",
+            "description": "Granola meeting ID"
+          }
+        },
+        "required": [
+          "meeting_id"
+        ]
+      }
+    }
+  ]
+}

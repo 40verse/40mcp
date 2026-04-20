@@ -1,0 +1,106 @@
+{
+  "_comment": "40mcp × emulate — points to local emulate Vercel server (port 4000). Run: npx emulate --service vercel --seed ../.emulate/emulate.config.yaml",
+  "name": "vercel-emulate",
+  "version": "1.0.0",
+  "baseUrl": "http://localhost:4000",
+  "auth": {
+    "type": "bearer",
+    "envVar": "VERCEL_ACCESS_TOKEN",
+    "_note": "Any non-empty string works — emulate does not validate tokens"
+  },
+  "tools": [
+    {
+      "name": "list_deployments",
+      "description": "List recent deployments (emulated).",
+      "method": "GET",
+      "path": "/v6/deployments",
+      "queryMap": { "project_id": "projectId", "team_id": "teamId", "deployment_state": "state", "max_results": "limit" },
+      "response": { "pick": ["deployments"], "limit": 20, "summary": true },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": { "type": "string", "description": "Filter by project ID" },
+          "team_id": { "type": "string", "description": "Filter by team ID or slug" },
+          "deployment_state": { "type": "string", "enum": ["BUILDING", "ERROR", "INITIALIZING", "QUEUED", "READY", "CANCELED"], "description": "Filter by deployment state" },
+          "max_results": { "type": "integer", "description": "Max results (1-100)" }
+        }
+      }
+    },
+    {
+      "name": "get_deployment",
+      "description": "Get details of a specific deployment (emulated).",
+      "method": "GET",
+      "path": "/v13/deployments/:deployment_id",
+      "response": { "pick": ["id", "url", "name", "state", "meta", "createdAt", "buildingAt", "ready", "source"] },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deployment_id": { "type": "string", "description": "Deployment ID or URL" }
+        },
+        "required": ["deployment_id"]
+      }
+    },
+    {
+      "name": "list_projects",
+      "description": "List all projects in the team or account (emulated).",
+      "method": "GET",
+      "path": "/v9/projects",
+      "queryMap": { "team_id": "teamId", "max_results": "limit" },
+      "response": { "pick": ["projects"], "limit": 20, "summary": true },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": { "type": "string", "description": "Team ID or slug" },
+          "max_results": { "type": "integer", "description": "Max results" }
+        }
+      }
+    },
+    {
+      "name": "get_project",
+      "description": "Get details of a specific project (emulated).",
+      "method": "GET",
+      "path": "/v9/projects/:project_id",
+      "queryMap": { "team_id": "teamId" },
+      "response": { "pick": ["id", "name", "framework", "link", "latestDeployments", "createdAt", "updatedAt"] },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": { "type": "string", "description": "Project ID or name" },
+          "team_id": { "type": "string", "description": "Team ID or slug" }
+        },
+        "required": ["project_id"]
+      }
+    },
+    {
+      "name": "list_domains",
+      "description": "List domains for the account (emulated).",
+      "method": "GET",
+      "path": "/v5/domains",
+      "queryMap": { "team_id": "teamId", "max_results": "limit" },
+      "response": { "pick": ["domains"], "limit": 20, "summary": true },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": { "type": "string", "description": "Team ID or slug" },
+          "max_results": { "type": "integer", "description": "Max results" }
+        }
+      }
+    },
+    {
+      "name": "list_env_vars",
+      "description": "List environment variables for a project (emulated).",
+      "method": "GET",
+      "path": "/v9/projects/:project_id/env",
+      "queryMap": { "team_id": "teamId" },
+      "response": { "pick": ["envs"], "limit": 50 },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": { "type": "string", "description": "Project ID or name" },
+          "team_id": { "type": "string", "description": "Team ID or slug" }
+        },
+        "required": ["project_id"]
+      }
+    }
+  ]
+}

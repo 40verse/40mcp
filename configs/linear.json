@@ -1,0 +1,487 @@
+{
+  "name": "linear",
+  "usage": {
+    "envVars": [
+      "LINEAR_API_KEY"
+    ],
+    "setup": "Create an API key at https://linear.app/settings/api. Personal keys are sufficient for single-workspace access."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.linear.app",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "LINEAR_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "search_issues",
+      "description": "Search Linear issues by text query.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search text"
+          },
+          "team_key": {
+            "type": "string",
+            "description": "Filter by team key (e.g., ENG)"
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by status (Todo, In Progress, Done)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "get_issue",
+      "description": "Get a Linear issue by identifier (e.g., ENG-123).",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Issue identifier (e.g., ENG-123)"
+          }
+        },
+        "required": [
+          "issue_id"
+        ]
+      }
+    },
+    {
+      "name": "create_issue",
+      "description": "Create a new Linear issue.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "Team UUID"
+          },
+          "title": {
+            "type": "string",
+            "description": "Issue title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Issue description (markdown)"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Priority: 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low"
+          },
+          "assignee_id": {
+            "type": "string",
+            "description": "Assignee UUID"
+          },
+          "label_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Label UUIDs"
+          }
+        },
+        "required": [
+          "team_id",
+          "title"
+        ]
+      }
+    },
+    {
+      "name": "update_issue",
+      "description": "Update a Linear issue.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Issue UUID"
+          },
+          "title": {
+            "type": "string",
+            "description": "New title"
+          },
+          "description": {
+            "type": "string",
+            "description": "New description"
+          },
+          "status_name": {
+            "type": "string",
+            "description": "New status name"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "New priority (0-4)"
+          },
+          "assignee_id": {
+            "type": "string",
+            "description": "New assignee UUID"
+          }
+        },
+        "required": [
+          "issue_id"
+        ]
+      }
+    },
+    {
+      "name": "list_teams",
+      "description": "List all Linear teams.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "key",
+          "name",
+          "description"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "list_projects",
+      "description": "List Linear projects with status.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "state",
+          "progress",
+          "lead.name"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "add_comment",
+      "description": "Add a comment to a Linear issue.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Issue UUID"
+          },
+          "body": {
+            "type": "string",
+            "description": "Comment body (markdown)"
+          }
+        },
+        "required": [
+          "issue_id",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "list_issues",
+      "description": "List Linear issues for a team with optional status and priority filters.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "identifier",
+          "title",
+          "state.name",
+          "priority",
+          "assignee.name",
+          "createdAt",
+          "updatedAt"
+        ],
+        "limit": 25,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "Team UUID to filter issues by"
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by workflow state name (e.g. 'In Progress', 'Todo')"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Filter by priority (0=None, 1=Urgent, 2=High, 3=Medium, 4=Low)"
+          },
+          "assignee_id": {
+            "type": "string",
+            "description": "Filter by assignee UUID"
+          },
+          "first": {
+            "type": "integer",
+            "description": "Number of issues to return (default 25, max 100)"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_cycles",
+      "description": "List all cycles (sprints) for a Linear team.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "number",
+          "name",
+          "startsAt",
+          "endsAt",
+          "completedAt",
+          "progress"
+        ],
+        "limit": 20,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "Team UUID whose cycles to list"
+          }
+        },
+        "required": [
+          "team_id"
+        ]
+      }
+    },
+    {
+      "name": "get_cycle",
+      "description": "Get details of a specific Linear cycle including start/end dates and completion progress.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "number",
+          "name",
+          "startsAt",
+          "endsAt",
+          "completedAt",
+          "progress",
+          "issueCount",
+          "completedIssueCount"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycle_id": {
+            "type": "string",
+            "description": "Cycle UUID"
+          }
+        },
+        "required": [
+          "cycle_id"
+        ]
+      }
+    },
+    {
+      "name": "list_cycle_issues",
+      "description": "List all issues assigned to a specific Linear cycle.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "identifier",
+          "title",
+          "state.name",
+          "priority",
+          "assignee.name"
+        ],
+        "limit": 50,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycle_id": {
+            "type": "string",
+            "description": "Cycle UUID"
+          },
+          "first": {
+            "type": "integer",
+            "description": "Number of issues to return"
+          }
+        },
+        "required": [
+          "cycle_id"
+        ]
+      }
+    },
+    {
+      "name": "list_labels",
+      "description": "List all issue labels available in a Linear team.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "color",
+          "description"
+        ],
+        "limit": 50
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "Team UUID to list labels for (omit for workspace-wide labels)"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_members",
+      "description": "List all members in the Linear workspace.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "email",
+          "displayName",
+          "active"
+        ],
+        "limit": 50
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_comment",
+      "description": "Get a specific comment on a Linear issue by comment ID.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "body",
+          "createdAt",
+          "updatedAt",
+          "user.name",
+          "issue.identifier"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comment_id": {
+            "type": "string",
+            "description": "Comment UUID"
+          }
+        },
+        "required": [
+          "comment_id"
+        ]
+      }
+    },
+    {
+      "name": "delete_comment",
+      "description": "Delete a comment from a Linear issue.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "success"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comment_id": {
+            "type": "string",
+            "description": "Comment UUID to delete"
+          }
+        },
+        "required": [
+          "comment_id"
+        ]
+      }
+    },
+    {
+      "name": "list_issue_comments",
+      "description": "List all comments on a specific Linear issue.",
+      "method": "POST",
+      "path": "/graphql",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "body",
+          "createdAt",
+          "user.name"
+        ],
+        "limit": 25,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Issue UUID whose comments to list"
+          },
+          "first": {
+            "type": "integer",
+            "description": "Number of comments to return"
+          }
+        },
+        "required": [
+          "issue_id"
+        ]
+      }
+    }
+  ]
+}

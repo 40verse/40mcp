@@ -1,0 +1,248 @@
+{
+  "name": "monday",
+  "usage": {
+    "envVars": [
+      "MONDAY_API_KEY"
+    ],
+    "scopes": [
+      "me:read",
+      "boards:read",
+      "boards:write",
+      "workspaces:read",
+      "updates:read",
+      "updates:write"
+    ],
+    "setup": "Generate an API token in monday.com at https://monday.com -> Profile -> Developers -> My Access Tokens."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.monday.com/v2",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "MONDAY_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "list_boards",
+      "description": "List monday.com boards the user has access to.",
+      "method": "POST",
+      "path": "/",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "description",
+          "state",
+          "board_kind",
+          "items_count",
+          "updated_at"
+        ],
+        "limit": 25,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max boards to return (default 25)"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number for pagination"
+          },
+          "board_kind": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private",
+              "share"
+            ],
+            "description": "Filter by board type"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived",
+              "deleted",
+              "all"
+            ],
+            "description": "Filter by board state (default 'active')"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_board",
+      "description": "Get a monday.com board by ID, including columns and groups.",
+      "method": "POST",
+      "path": "/",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "description",
+          "columns",
+          "groups",
+          "items_count"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string",
+            "description": "Board ID"
+          }
+        },
+        "required": [
+          "board_id"
+        ]
+      }
+    },
+    {
+      "name": "list_items",
+      "description": "List items (rows) in a monday.com board, optionally filtered by group or column value.",
+      "method": "POST",
+      "path": "/",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "state",
+          "group",
+          "column_values",
+          "updated_at",
+          "creator"
+        ],
+        "limit": 50,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string",
+            "description": "Board ID to list items from"
+          },
+          "group_id": {
+            "type": "string",
+            "description": "Filter by group ID (optional)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max items to return (default 50)"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor"
+          }
+        },
+        "required": [
+          "board_id"
+        ]
+      }
+    },
+    {
+      "name": "create_item",
+      "description": "Create a new item (row) in a monday.com board.",
+      "method": "POST",
+      "path": "/",
+      "graphql": true,
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string",
+            "description": "Board ID to create the item in"
+          },
+          "item_name": {
+            "type": "string",
+            "description": "Name of the new item"
+          },
+          "group_id": {
+            "type": "string",
+            "description": "Group ID to add the item to (optional, defaults to first group)"
+          },
+          "column_values": {
+            "type": "object",
+            "description": "Column values as JSON object keyed by column ID (e.g., {status: {label: 'Done'}, date: {date: '2024-01-15'}})"
+          }
+        },
+        "required": [
+          "board_id",
+          "item_name"
+        ]
+      }
+    },
+    {
+      "name": "update_item",
+      "description": "Update column values on a monday.com item.",
+      "method": "POST",
+      "path": "/",
+      "graphql": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string",
+            "description": "Board ID containing the item"
+          },
+          "item_id": {
+            "type": "string",
+            "description": "Item ID to update"
+          },
+          "column_values": {
+            "type": "object",
+            "description": "Column values to update as JSON object keyed by column ID"
+          }
+        },
+        "required": [
+          "board_id",
+          "item_id",
+          "column_values"
+        ]
+      }
+    },
+    {
+      "name": "search_items",
+      "description": "Search for items across monday.com boards by name or value.",
+      "method": "POST",
+      "path": "/",
+      "graphql": true,
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "board",
+          "group",
+          "column_values",
+          "updated_at"
+        ],
+        "limit": 25,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search text to find in item names"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max items to return"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  ]
+}

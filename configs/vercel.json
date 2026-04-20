@@ -1,0 +1,853 @@
+{
+  "name": "vercel",
+  "usage": {
+    "envVars": [
+      "VERCEL_ACCESS_TOKEN"
+    ],
+    "setup": "Create an access token at https://vercel.com/account/tokens. Scope it to a specific team if needed."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.vercel.com",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "VERCEL_ACCESS_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "list_deployments",
+      "description": "List recent deployments across all projects or filtered to a specific project, with build state and URL.",
+      "method": "GET",
+      "path": "/v6/deployments",
+      "queryMap": {
+        "project_id": "projectId",
+        "team_id": "teamId",
+        "limit": "limit",
+        "state": "state",
+        "target": "target"
+      },
+      "response": {
+        "pick": [
+          "uid",
+          "name",
+          "url",
+          "state",
+          "target",
+          "source",
+          "created",
+          "ready",
+          "creator.username"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Filter deployments to this project ID or name"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug to scope the request"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max deployments to return (default 20)"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "BUILDING",
+              "ERROR",
+              "INITIALIZING",
+              "QUEUED",
+              "READY",
+              "CANCELED"
+            ],
+            "description": "Filter by deployment state"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "production",
+              "staging",
+              "preview"
+            ],
+            "description": "Filter by deployment target environment"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_deployment",
+      "description": "Retrieve full details of a specific Vercel deployment including build logs URL, domains, and environment.",
+      "method": "GET",
+      "path": "/v13/deployments/:deployment_id",
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "url",
+          "state",
+          "target",
+          "meta",
+          "regions",
+          "builds",
+          "creator",
+          "created",
+          "ready",
+          "error"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deployment_id": {
+            "type": "string",
+            "description": "Deployment ID (dpl_...) or deployment URL"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug if deployment belongs to a team"
+          }
+        },
+        "required": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "cancel_deployment",
+      "description": "Cancel a Vercel deployment that is currently in BUILDING or QUEUED state.",
+      "method": "PATCH",
+      "path": "/v12/deployments/:deployment_id/cancel",
+      "queryMap": {
+        "team_id": "teamId"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "state",
+          "url",
+          "created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deployment_id": {
+            "type": "string",
+            "description": "Deployment ID to cancel"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug if deployment belongs to a team"
+          }
+        },
+        "required": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "list_projects",
+      "description": "List all Vercel projects accessible by the token with framework, domain, and latest deployment info.",
+      "method": "GET",
+      "path": "/v9/projects",
+      "queryMap": {
+        "team_id": "teamId",
+        "limit": "limit",
+        "search": "search"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "framework",
+          "link",
+          "latestDeployments",
+          "createdAt",
+          "updatedAt"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug to list team projects"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max projects to return"
+          },
+          "search": {
+            "type": "string",
+            "description": "Filter projects by name"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_project",
+      "description": "Retrieve details of a specific Vercel project including framework, git integration, and environment variable count.",
+      "method": "GET",
+      "path": "/v9/projects/:project_id",
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "framework",
+          "rootDirectory",
+          "buildCommand",
+          "devCommand",
+          "installCommand",
+          "link",
+          "createdAt",
+          "updatedAt"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project ID or project name"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug if project belongs to a team"
+          }
+        },
+        "required": [
+          "project_id"
+        ]
+      }
+    },
+    {
+      "name": "create_project",
+      "description": "Create a new Vercel project with optional Git repository connection and framework configuration.",
+      "method": "POST",
+      "path": "/v9/projects",
+      "queryMap": {
+        "team_id": "teamId"
+      },
+      "bodyMap": {
+        "name": "name",
+        "framework": "framework",
+        "build_command": "buildCommand",
+        "dev_command": "devCommand",
+        "install_command": "installCommand",
+        "root_directory": "rootDirectory",
+        "public_source": "publicSource"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "framework",
+          "rootDirectory",
+          "createdAt"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Project name (must be unique within the account/team)"
+          },
+          "framework": {
+            "type": "string",
+            "description": "Framework preset (e.g. nextjs, create-react-app, gatsby, vue)"
+          },
+          "build_command": {
+            "type": "string",
+            "description": "Custom build command (overrides framework default)"
+          },
+          "dev_command": {
+            "type": "string",
+            "description": "Custom dev server command"
+          },
+          "install_command": {
+            "type": "string",
+            "description": "Custom install command (e.g. npm install, yarn)"
+          },
+          "root_directory": {
+            "type": "string",
+            "description": "Root directory of the project relative to the repo root"
+          },
+          "public_source": {
+            "type": "boolean",
+            "description": "Make the source code publicly visible"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug to create the project under"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "update_project",
+      "description": "Update settings of an existing Vercel project such as framework, build commands, or root directory.",
+      "method": "PATCH",
+      "path": "/v9/projects/:project_id",
+      "queryMap": {
+        "team_id": "teamId"
+      },
+      "bodyMap": {
+        "name": "name",
+        "framework": "framework",
+        "build_command": "buildCommand",
+        "dev_command": "devCommand",
+        "install_command": "installCommand",
+        "root_directory": "rootDirectory"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "framework",
+          "rootDirectory",
+          "updatedAt"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project ID or project name"
+          },
+          "name": {
+            "type": "string",
+            "description": "New project name"
+          },
+          "framework": {
+            "type": "string",
+            "description": "New framework preset"
+          },
+          "build_command": {
+            "type": "string",
+            "description": "New build command"
+          },
+          "dev_command": {
+            "type": "string",
+            "description": "New dev server command"
+          },
+          "install_command": {
+            "type": "string",
+            "description": "New install command"
+          },
+          "root_directory": {
+            "type": "string",
+            "description": "New root directory"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug"
+          }
+        },
+        "required": [
+          "project_id"
+        ]
+      }
+    },
+    {
+      "name": "delete_project",
+      "description": "Permanently delete a Vercel project and all its deployments. This cannot be undone.",
+      "method": "DELETE",
+      "path": "/v9/projects/:project_id",
+      "queryMap": {
+        "team_id": "teamId"
+      },
+      "response": {
+        "pick": []
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project ID or project name to delete"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug if project belongs to a team"
+          }
+        },
+        "required": [
+          "project_id"
+        ]
+      }
+    },
+    {
+      "name": "list_env_vars",
+      "description": "List environment variables for a Vercel project. Returns variable keys and their target environments (production/preview/development). Values are redacted for sensitive vars.",
+      "method": "GET",
+      "path": "/v9/projects/:project_id/env",
+      "queryMap": {
+        "team_id": "teamId",
+        "decrypt": "decrypt"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "key",
+          "value",
+          "type",
+          "target",
+          "gitBranch",
+          "createdAt",
+          "updatedAt"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project ID or project name"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug if project belongs to a team"
+          },
+          "decrypt": {
+            "type": "boolean",
+            "description": "Return decrypted values for encrypted env vars (requires elevated token scope)"
+          }
+        },
+        "required": [
+          "project_id"
+        ]
+      }
+    },
+    {
+      "name": "create_env_var",
+      "description": "Add a new environment variable to a Vercel project for one or more target environments.",
+      "method": "POST",
+      "path": "/v10/projects/:project_id/env",
+      "queryMap": {
+        "team_id": "teamId"
+      },
+      "bodyMap": {
+        "key": "key",
+        "value": "value",
+        "type": "type",
+        "target": "target",
+        "git_branch": "gitBranch"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "key",
+          "type",
+          "target",
+          "createdAt"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project ID or project name"
+          },
+          "key": {
+            "type": "string",
+            "description": "Environment variable name (e.g. DATABASE_URL)"
+          },
+          "value": {
+            "type": "string",
+            "description": "Environment variable value"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "plain",
+              "secret",
+              "encrypted"
+            ],
+            "description": "Variable type (plain = visible, secret = encrypted at rest)"
+          },
+          "target": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "production",
+                "preview",
+                "development"
+              ]
+            },
+            "description": "Environments where this variable is available"
+          },
+          "git_branch": {
+            "type": "string",
+            "description": "Specific branch for preview environment variables"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug"
+          }
+        },
+        "required": [
+          "project_id",
+          "key",
+          "value",
+          "type",
+          "target"
+        ]
+      }
+    },
+    {
+      "name": "update_env_var",
+      "description": "Update an existing environment variable value or target environments.",
+      "method": "PATCH",
+      "path": "/v9/projects/:project_id/env/:env_id",
+      "queryMap": {
+        "team_id": "teamId"
+      },
+      "bodyMap": {
+        "value": "value",
+        "type": "type",
+        "target": "target",
+        "git_branch": "gitBranch"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "key",
+          "type",
+          "target",
+          "updatedAt"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project ID or project name"
+          },
+          "env_id": {
+            "type": "string",
+            "description": "Environment variable ID"
+          },
+          "value": {
+            "type": "string",
+            "description": "New value for the environment variable"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "plain",
+              "secret",
+              "encrypted"
+            ],
+            "description": "New variable type"
+          },
+          "target": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "production",
+                "preview",
+                "development"
+              ]
+            },
+            "description": "New target environments"
+          },
+          "git_branch": {
+            "type": "string",
+            "description": "New branch scope for preview vars"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug"
+          }
+        },
+        "required": [
+          "project_id",
+          "env_id"
+        ]
+      }
+    },
+    {
+      "name": "delete_env_var",
+      "description": "Remove an environment variable from a Vercel project.",
+      "method": "DELETE",
+      "path": "/v9/projects/:project_id/env/:env_id",
+      "queryMap": {
+        "team_id": "teamId"
+      },
+      "response": {
+        "pick": []
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project ID or project name"
+          },
+          "env_id": {
+            "type": "string",
+            "description": "Environment variable ID to delete"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug"
+          }
+        },
+        "required": [
+          "project_id",
+          "env_id"
+        ]
+      }
+    },
+    {
+      "name": "list_domains",
+      "description": "List all domains registered on the account with expiry dates and DNS configuration status.",
+      "method": "GET",
+      "path": "/v5/domains",
+      "queryMap": {
+        "team_id": "teamId",
+        "limit": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "boughtAt",
+          "expiresAt",
+          "verified",
+          "nameservers",
+          "intendedNameservers"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug to scope the request"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max domains to return"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_domain",
+      "description": "Retrieve details of a specific domain including DNS records and verification status.",
+      "method": "GET",
+      "path": "/v5/domains/:domain",
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "boughtAt",
+          "expiresAt",
+          "verified",
+          "nameservers",
+          "intendedNameservers",
+          "creator"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "Domain name (e.g. example.com)"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug if domain belongs to a team"
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "list_aliases",
+      "description": "List all aliases (custom domains and subdomains) assigned to Vercel deployments.",
+      "method": "GET",
+      "path": "/v4/aliases",
+      "queryMap": {
+        "project_id": "projectId",
+        "team_id": "teamId",
+        "limit": "limit",
+        "domain": "domain"
+      },
+      "response": {
+        "pick": [
+          "uid",
+          "alias",
+          "created",
+          "deploymentId",
+          "domain"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Filter aliases for this project"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max aliases to return"
+          },
+          "domain": {
+            "type": "string",
+            "description": "Filter aliases by domain"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_alias",
+      "description": "Retrieve details of a specific Vercel alias (custom domain) and the deployment it points to.",
+      "method": "GET",
+      "path": "/v4/aliases/:alias_or_id",
+      "queryMap": {
+        "team_id": "teamId"
+      },
+      "response": {
+        "pick": [
+          "uid",
+          "alias",
+          "created",
+          "deploymentId",
+          "domain",
+          "redirect"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "alias_or_id": {
+            "type": "string",
+            "description": "Alias ID or the alias hostname (e.g. myapp.vercel.app)"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or slug"
+          }
+        },
+        "required": [
+          "alias_or_id"
+        ]
+      }
+    },
+    {
+      "name": "list_teams",
+      "description": "List all teams the authenticated user is a member of.",
+      "method": "GET",
+      "path": "/v2/teams",
+      "queryMap": {
+        "limit": "limit",
+        "since": "since",
+        "until": "until"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "slug",
+          "name",
+          "avatar",
+          "membership",
+          "created"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max teams to return"
+          },
+          "since": {
+            "type": "integer",
+            "description": "Timestamp to paginate teams created after"
+          },
+          "until": {
+            "type": "integer",
+            "description": "Timestamp to paginate teams created before"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_team",
+      "description": "Retrieve details of a specific Vercel team including membership and billing info.",
+      "method": "GET",
+      "path": "/v2/teams/:team_id",
+      "response": {
+        "pick": [
+          "id",
+          "slug",
+          "name",
+          "avatar",
+          "created",
+          "membership",
+          "billing",
+          "softBlock"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "Team ID or team slug"
+          }
+        },
+        "required": [
+          "team_id"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,305 @@
+{
+  "_comment": "Supabase config. Required env vars: SUPABASE_URL (project URL, e.g. https://xyz.supabase.co), SUPABASE_SERVICE_ROLE_KEY (service role key from Project Settings > API). Required scopes: service_role key grants full database access. For restricted access use anon key with RLS. Docs: https://supabase.com/docs/reference/javascript/introduction",
+  "name": "supabase",
+  "usage": {
+    "envVars": [
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "SUPABASE_PROJECT_REF",
+      "SUPABASE_URL"
+    ],
+    "envVarDescriptions": {
+      "SUPABASE_URL": "Your Supabase project URL, no trailing slash (e.g. 'https://xyz.supabase.co') — substituted into baseUrl."
+    },
+    "setup": "Find your service role key and project ref in Supabase Dashboard -> Settings -> API. The service role key bypasses Row Level Security — use with caution. Set SUPABASE_URL to your project URL (e.g. https://xyz.supabase.co)."
+  },
+  "version": "1.0.0",
+  "baseUrl": "${SUPABASE_URL}",
+  "strictSsrf": true,
+  "auth": {
+    "type": "header",
+    "header": "apikey",
+    "envVar": "SUPABASE_SERVICE_ROLE_KEY"
+  },
+  "tools": [
+    {
+      "name": "query_table",
+      "description": "Query rows from a Supabase table using PostgREST syntax. Supports filtering, ordering, and pagination. Use column=value for equality, column=gte.value for >=, column=like.*pattern* for LIKE.",
+      "method": "GET",
+      "path": "/rest/v1/:table",
+      "queryMap": {
+        "select": "select",
+        "filter": "filter",
+        "order": "order",
+        "limit": "limit",
+        "offset": "offset"
+      },
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_SERVICE_ROLE_KEY}",
+        "Prefer": "return=representation"
+      },
+      "response": {
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table name to query"
+          },
+          "select": {
+            "type": "string",
+            "description": "Columns to return (e.g. 'id,name,email' or '*'). Default '*'"
+          },
+          "filter": {
+            "type": "string",
+            "description": "PostgREST filter string appended as query params (e.g. 'status=eq.active&created_at=gte.2024-01-01')"
+          },
+          "order": {
+            "type": "string",
+            "description": "Sort column and direction (e.g. 'created_at.desc' or 'name.asc')"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max rows to return (default 25)"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Row offset for pagination"
+          }
+        },
+        "required": [
+          "table"
+        ]
+      }
+    },
+    {
+      "name": "insert_row",
+      "description": "Insert one or more rows into a Supabase table. Returns the inserted row(s) with generated IDs.",
+      "method": "POST",
+      "path": "/rest/v1/:table",
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_SERVICE_ROLE_KEY}",
+        "Prefer": "return=representation"
+      },
+      "response": {
+        "limit": 10,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table name to insert into"
+          },
+          "row": {
+            "type": "object",
+            "description": "Object with column names as keys and values to insert"
+          }
+        },
+        "required": [
+          "table",
+          "row"
+        ]
+      }
+    },
+    {
+      "name": "update_rows",
+      "description": "Update rows in a Supabase table matching a filter. Use PostgREST filter syntax in the filter param.",
+      "method": "PATCH",
+      "path": "/rest/v1/:table",
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_SERVICE_ROLE_KEY}",
+        "Prefer": "return=representation"
+      },
+      "response": {
+        "limit": 25,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table name to update"
+          },
+          "filter": {
+            "type": "string",
+            "description": "PostgREST filter to target rows (e.g. 'id=eq.123'). Required to prevent accidental full-table update."
+          },
+          "updates": {
+            "type": "object",
+            "description": "Object with column names as keys and new values"
+          }
+        },
+        "required": [
+          "table",
+          "filter",
+          "updates"
+        ]
+      }
+    },
+    {
+      "name": "delete_rows",
+      "description": "Delete rows from a Supabase table matching a filter. Requires explicit filter to avoid accidental full-table delete.",
+      "method": "DELETE",
+      "path": "/rest/v1/:table",
+      "policy": "require_approval",
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_SERVICE_ROLE_KEY}",
+        "Prefer": "return=representation"
+      },
+      "response": {
+        "limit": 25,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table name to delete from"
+          },
+          "filter": {
+            "type": "string",
+            "description": "PostgREST filter to target rows (e.g. 'id=eq.123' or 'status=eq.archived'). Required."
+          }
+        },
+        "required": [
+          "table",
+          "filter"
+        ]
+      }
+    },
+    {
+      "name": "run_rpc",
+      "description": "Call a Supabase database function (RPC / stored procedure) via the PostgREST RPC endpoint.",
+      "method": "POST",
+      "path": "/rest/v1/rpc/:function_name",
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
+      },
+      "response": {
+        "tokenBudget": 3000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "function_name": {
+            "type": "string",
+            "description": "PostgreSQL function name to call"
+          },
+          "args": {
+            "type": "object",
+            "description": "Arguments to pass to the function as key-value pairs"
+          }
+        },
+        "required": [
+          "function_name"
+        ]
+      }
+    },
+    {
+      "name": "list_storage_buckets",
+      "description": "List all storage buckets in the Supabase project.",
+      "method": "GET",
+      "path": "/storage/v1/bucket",
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "public",
+          "file_size_limit",
+          "allowed_mime_types",
+          "created_at"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "list_storage_objects",
+      "description": "List files (objects) within a Supabase storage bucket, optionally filtered by path prefix.",
+      "method": "GET",
+      "path": "/storage/v1/object/list/:bucket",
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
+      },
+      "response": {
+        "pick": [
+          "name",
+          "id",
+          "metadata",
+          "created_at",
+          "updated_at"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "description": "Bucket name to list objects in"
+          },
+          "prefix": {
+            "type": "string",
+            "description": "Path prefix to filter objects (e.g. 'images/2024/')"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max objects to return (default 100)"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Offset for pagination"
+          }
+        },
+        "required": [
+          "bucket"
+        ]
+      }
+    },
+    {
+      "name": "invoke_edge_function",
+      "description": "Invoke a Supabase Edge Function by name with an optional JSON body. Edge Functions are Deno-based serverless functions.",
+      "method": "POST",
+      "path": "/functions/v1/:function_name",
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
+      },
+      "response": {
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "function_name": {
+            "type": "string",
+            "description": "Edge Function name as deployed (e.g. 'send-email' or 'process-webhook')"
+          },
+          "body": {
+            "type": "object",
+            "description": "JSON body to send to the function"
+          }
+        },
+        "required": [
+          "function_name"
+        ]
+      }
+    }
+  ]
+}

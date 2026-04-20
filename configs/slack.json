@@ -1,0 +1,615 @@
+{
+  "name": "slack",
+  "usage": {
+    "envVars": [
+      "SLACK_BOT_TOKEN"
+    ],
+    "scopes": [
+      "channels:read",
+      "channels:history",
+      "channels:write",
+      "chat:write",
+      "users:read",
+      "files:read",
+      "files:write",
+      "reactions:write",
+      "search:read"
+    ],
+    "setup": "Create a Slack app at https://api.slack.com/apps, add a bot token with the required OAuth scopes, install the app to your workspace, and copy the Bot User OAuth Token from the OAuth & Permissions page."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://slack.com/api",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "SLACK_BOT_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "list_channels",
+      "description": "List Slack channels the bot has access to.",
+      "method": "GET",
+      "path": "/conversations.list",
+      "queryMap": {
+        "channel_types": "types",
+        "max_results": "limit",
+        "exclude_archived": "exclude_archived"
+      },
+      "response": {
+        "pick": [
+          "channels"
+        ],
+        "template": "#{name} ({num_members} members) — {purpose.value}",
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_types": {
+            "type": "string",
+            "description": "Comma-separated: public_channel, private_channel, mpim, im"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max channels to return"
+          },
+          "exclude_archived": {
+            "type": "boolean",
+            "description": "Exclude archived channels"
+          }
+        }
+      }
+    },
+    {
+      "name": "send_message",
+      "policy": "require_approval",
+      "description": "Send a message to a Slack channel.",
+      "method": "POST",
+      "path": "/chat.postMessage",
+      "bodyMap": {
+        "channel_id": "channel",
+        "message_text": "text",
+        "thread_id": "thread_ts"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel ID (C...)"
+          },
+          "message_text": {
+            "type": "string",
+            "description": "Message text (markdown supported)"
+          },
+          "thread_id": {
+            "type": "string",
+            "description": "Thread timestamp to reply in thread"
+          }
+        },
+        "required": [
+          "channel_id",
+          "message_text"
+        ]
+      }
+    },
+    {
+      "name": "get_channel_history",
+      "description": "Get recent messages from a Slack channel.",
+      "method": "GET",
+      "path": "/conversations.history",
+      "queryMap": {
+        "channel_id": "channel",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "messages"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel ID (C...)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max messages to return"
+          }
+        },
+        "required": [
+          "channel_id"
+        ]
+      }
+    },
+    {
+      "name": "search_messages",
+      "description": "Search for messages across Slack workspace.",
+      "method": "GET",
+      "path": "/search.messages",
+      "queryMap": {
+        "search_query": "query",
+        "sort_by": "sort",
+        "sort_direction": "sort_dir",
+        "max_results": "count"
+      },
+      "response": {
+        "pick": [
+          "messages.total",
+          "messages.matches"
+        ],
+        "limit": 20,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search_query": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "score",
+              "timestamp"
+            ],
+            "description": "Sort by relevance or time"
+          },
+          "sort_direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results"
+          }
+        },
+        "required": [
+          "search_query"
+        ]
+      }
+    },
+    {
+      "name": "list_users",
+      "description": "List users in the Slack workspace.",
+      "method": "GET",
+      "path": "/users.list",
+      "queryMap": {
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "members"
+        ],
+        "template": "@{name} ({real_name}) — {profile.title}",
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_results": {
+            "type": "integer",
+            "description": "Max users to return"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_user_info",
+      "description": "Get detailed info about a Slack user.",
+      "method": "GET",
+      "path": "/users.info",
+      "queryMap": {
+        "user_id": "user"
+      },
+      "response": {
+        "pick": [
+          "user.id",
+          "user.name",
+          "user.real_name",
+          "user.profile.email",
+          "user.profile.title",
+          "user.tz"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "User ID (U...)"
+          }
+        },
+        "required": [
+          "user_id"
+        ]
+      }
+    },
+    {
+      "name": "get_channel_info",
+      "description": "Get detailed information about a Slack channel including membership count, topic, and purpose.",
+      "method": "GET",
+      "path": "/conversations.info",
+      "queryMap": {
+        "channel_id": "channel",
+        "include_num_members": "include_num_members"
+      },
+      "response": {
+        "pick": [
+          "channel.id",
+          "channel.name",
+          "channel.topic",
+          "channel.purpose",
+          "channel.num_members",
+          "channel.is_archived",
+          "channel.is_private",
+          "channel.created"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel ID (C...)"
+          },
+          "include_num_members": {
+            "type": "boolean",
+            "description": "Include member count in response"
+          }
+        },
+        "required": [
+          "channel_id"
+        ]
+      }
+    },
+    {
+      "name": "create_channel",
+      "description": "Create a new Slack channel (public or private).",
+      "method": "POST",
+      "path": "/conversations.create",
+      "bodyMap": {
+        "channel_name": "name",
+        "is_private": "is_private"
+      },
+      "response": {
+        "pick": [
+          "channel.id",
+          "channel.name",
+          "channel.is_private",
+          "channel.created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_name": {
+            "type": "string",
+            "description": "Name of the channel (lowercase, no spaces — use hyphens)"
+          },
+          "is_private": {
+            "type": "boolean",
+            "description": "Create as private channel (default false = public)"
+          }
+        },
+        "required": [
+          "channel_name"
+        ]
+      }
+    },
+    {
+      "name": "invite_users_to_channel",
+      "description": "Invite one or more users to a Slack channel.",
+      "method": "POST",
+      "path": "/conversations.invite",
+      "bodyMap": {
+        "channel_id": "channel",
+        "user_ids": "users"
+      },
+      "response": {
+        "pick": [
+          "channel.id",
+          "channel.name",
+          "channel.num_members"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel ID to invite users to"
+          },
+          "user_ids": {
+            "type": "string",
+            "description": "Comma-separated user IDs to invite (e.g. U1234,U5678)"
+          }
+        },
+        "required": [
+          "channel_id",
+          "user_ids"
+        ]
+      }
+    },
+    {
+      "name": "upload_file",
+      "description": "Upload a file to a Slack channel (uses files.getUploadURLExternal + files.completeUploadExternal pattern).",
+      "method": "POST",
+      "path": "/files.getUploadURLExternal",
+      "bodyMap": {
+        "filename": "filename",
+        "length": "length",
+        "alt_txt": "alt_txt"
+      },
+      "response": {
+        "pick": [
+          "upload_url",
+          "file_id"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Name of the file to upload (including extension)"
+          },
+          "length": {
+            "type": "integer",
+            "description": "File size in bytes"
+          },
+          "alt_txt": {
+            "type": "string",
+            "description": "Alt text for the file (accessibility)"
+          }
+        },
+        "required": [
+          "filename",
+          "length"
+        ]
+      }
+    },
+    {
+      "name": "list_files",
+      "description": "List files uploaded to the Slack workspace, with optional channel or user filters.",
+      "method": "GET",
+      "path": "/files.list",
+      "queryMap": {
+        "channel_id": "channel",
+        "user_id": "user",
+        "file_types": "types",
+        "max_results": "count",
+        "page": "page"
+      },
+      "response": {
+        "pick": [
+          "files",
+          "paging"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Filter files from this channel"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "Filter files uploaded by this user"
+          },
+          "file_types": {
+            "type": "string",
+            "description": "Comma-separated file types: all, spaces, snippets, images, gdocs, zips, pdfs"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max files per page (default 100)"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number (1-based)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_file",
+      "description": "Retrieve metadata and download URL for a specific Slack file.",
+      "method": "GET",
+      "path": "/files.info",
+      "queryMap": {
+        "file_id": "file"
+      },
+      "response": {
+        "pick": [
+          "file.id",
+          "file.name",
+          "file.mimetype",
+          "file.size",
+          "file.url_private",
+          "file.permalink",
+          "file.channels",
+          "file.created"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "description": "File ID (F...)"
+          }
+        },
+        "required": [
+          "file_id"
+        ]
+      }
+    },
+    {
+      "name": "get_thread_replies",
+      "description": "Get all replies in a message thread.",
+      "method": "GET",
+      "path": "/conversations.replies",
+      "queryMap": {
+        "channel_id": "channel",
+        "thread_ts": "ts",
+        "max_results": "limit",
+        "oldest": "oldest"
+      },
+      "response": {
+        "pick": [
+          "messages"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel ID the thread is in"
+          },
+          "thread_ts": {
+            "type": "string",
+            "description": "Timestamp of the parent message (thread_ts)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max replies to return"
+          },
+          "oldest": {
+            "type": "string",
+            "description": "Return replies after this timestamp"
+          }
+        },
+        "required": [
+          "channel_id",
+          "thread_ts"
+        ]
+      }
+    },
+    {
+      "name": "add_reaction",
+      "description": "Add an emoji reaction to a Slack message.",
+      "method": "POST",
+      "path": "/reactions.add",
+      "bodyMap": {
+        "channel_id": "channel",
+        "message_ts": "timestamp",
+        "emoji_name": "name"
+      },
+      "response": {
+        "pick": [
+          "ok"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel containing the message"
+          },
+          "message_ts": {
+            "type": "string",
+            "description": "Timestamp of the message to react to"
+          },
+          "emoji_name": {
+            "type": "string",
+            "description": "Emoji name without colons (e.g. 'thumbsup', 'white_check_mark')"
+          }
+        },
+        "required": [
+          "channel_id",
+          "message_ts",
+          "emoji_name"
+        ]
+      }
+    },
+    {
+      "name": "delete_message",
+      "policy": "require_approval",
+      "description": "Delete a message from a Slack channel. Bot can only delete its own messages unless it has admin scope.",
+      "method": "POST",
+      "path": "/chat.delete",
+      "bodyMap": {
+        "channel_id": "channel",
+        "message_ts": "ts"
+      },
+      "response": {
+        "pick": [
+          "ok",
+          "channel",
+          "ts"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel ID containing the message"
+          },
+          "message_ts": {
+            "type": "string",
+            "description": "Timestamp of the message to delete"
+          }
+        },
+        "required": [
+          "channel_id",
+          "message_ts"
+        ]
+      }
+    },
+    {
+      "name": "set_channel_topic",
+      "description": "Set or update the topic of a Slack channel.",
+      "method": "POST",
+      "path": "/conversations.setTopic",
+      "bodyMap": {
+        "channel_id": "channel",
+        "topic": "topic"
+      },
+      "response": {
+        "pick": [
+          "topic"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel ID to update"
+          },
+          "topic": {
+            "type": "string",
+            "description": "New channel topic text"
+          }
+        },
+        "required": [
+          "channel_id",
+          "topic"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,588 @@
+{
+  "name": "gmail",
+  "usage": {
+    "envVars": [
+      "GMAIL_ACCESS_TOKEN"
+    ],
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.send",
+      "https://www.googleapis.com/auth/gmail.modify",
+      "https://www.googleapis.com/auth/gmail.labels"
+    ],
+    "setup": "Obtain an OAuth 2.0 access token via Google Cloud Console (https://console.cloud.google.com). Enable the Gmail API, create OAuth credentials, and authorize with the scopes above."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://gmail.googleapis.com/gmail/v1/users/me",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "GMAIL_ACCESS_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "search_messages",
+      "description": "Search Gmail messages using Gmail query syntax (e.g., 'from:boss@example.com subject:report is:unread').",
+      "method": "GET",
+      "path": "/messages",
+      "queryMap": {
+        "q": "q",
+        "maxResults": "maxResults",
+        "pageToken": "pageToken",
+        "labelIds": "labelIds",
+        "includeSpamTrash": "includeSpamTrash"
+      },
+      "response": {
+        "pick": [
+          "messages",
+          "nextPageToken",
+          "resultSizeEstimate"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Gmail search query (e.g., 'from:alice@example.com after:2024/01/01 has:attachment')"
+          },
+          "maxResults": {
+            "type": "integer",
+            "description": "Max messages to return (default 25, max 500)"
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "Page token for pagination"
+          },
+          "labelIds": {
+            "type": "string",
+            "description": "Comma-separated label IDs to filter by (e.g., 'INBOX,UNREAD')"
+          },
+          "includeSpamTrash": {
+            "type": "boolean",
+            "description": "Include messages in Spam and Trash (default false)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_message",
+      "description": "Retrieve a Gmail message by ID, including headers and body.",
+      "method": "GET",
+      "path": "/messages/:message_id",
+      "queryMap": {
+        "format": "format"
+      },
+      "response": {
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "Gmail message ID"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "full",
+              "metadata",
+              "minimal",
+              "raw"
+            ],
+            "description": "Format of the response (default 'full')"
+          }
+        },
+        "required": [
+          "message_id"
+        ]
+      }
+    },
+    {
+      "name": "send_message",
+      "description": "Send an email via Gmail.",
+      "method": "POST",
+      "path": "/messages/send",
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "Recipient email address(es), comma-separated"
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject"
+          },
+          "body": {
+            "type": "string",
+            "description": "Email body text (plain text or HTML)"
+          },
+          "cc": {
+            "type": "string",
+            "description": "CC recipients, comma-separated"
+          },
+          "bcc": {
+            "type": "string",
+            "description": "BCC recipients, comma-separated"
+          },
+          "reply_to_message_id": {
+            "type": "string",
+            "description": "Message ID to reply to (sets In-Reply-To header)"
+          }
+        },
+        "required": [
+          "to",
+          "subject",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "delete_message",
+      "description": "Permanently delete a Gmail message by ID. This bypasses trash and cannot be undone — use trash_message for recoverable deletion.",
+      "method": "DELETE",
+      "path": "/messages/:message_id",
+      "response": {
+        "pick": []
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "Gmail message ID to permanently delete"
+          }
+        },
+        "required": [
+          "message_id"
+        ]
+      }
+    },
+    {
+      "name": "trash_message",
+      "description": "Move a Gmail message to the Trash. Can be restored within 30 days. Prefer this over delete_message.",
+      "method": "POST",
+      "path": "/messages/:message_id/trash",
+      "response": {
+        "pick": [
+          "id",
+          "labelIds"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "Gmail message ID to move to trash"
+          }
+        },
+        "required": [
+          "message_id"
+        ]
+      }
+    },
+    {
+      "name": "mark_as_read",
+      "description": "Mark a Gmail message as read by removing the UNREAD label.",
+      "method": "POST",
+      "path": "/messages/:message_id/modify",
+      "bodyMap": {
+        "removeLabelIds": "removeLabelIds"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "labelIds"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "Gmail message ID to mark as read"
+          },
+          "removeLabelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Label IDs to remove — pass ['UNREAD'] to mark as read",
+            "default": [
+              "UNREAD"
+            ]
+          }
+        },
+        "required": [
+          "message_id",
+          "removeLabelIds"
+        ]
+      }
+    },
+    {
+      "name": "list_labels",
+      "description": "List all Gmail labels (folders) in the mailbox.",
+      "method": "GET",
+      "path": "/labels",
+      "response": {
+        "pick": [
+          "labels"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "create_label",
+      "description": "Create a new Gmail label (folder) for organizing messages.",
+      "method": "POST",
+      "path": "/labels",
+      "bodyMap": {
+        "name": "name",
+        "message_list_visibility": "messageListVisibility",
+        "label_list_visibility": "labelListVisibility"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "messageListVisibility",
+          "labelListVisibility",
+          "type"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Label name (use '/' for nesting, e.g. 'Work/Projects')"
+          },
+          "message_list_visibility": {
+            "type": "string",
+            "enum": [
+              "show",
+              "hide"
+            ],
+            "description": "Whether to show messages with this label in the message list"
+          },
+          "label_list_visibility": {
+            "type": "string",
+            "enum": [
+              "labelShow",
+              "labelShowIfUnread",
+              "labelHide"
+            ],
+            "description": "Whether to show this label in the label list"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "update_label",
+      "description": "Update an existing Gmail label name or visibility settings.",
+      "method": "PATCH",
+      "path": "/labels/:label_id",
+      "bodyMap": {
+        "name": "name",
+        "message_list_visibility": "messageListVisibility",
+        "label_list_visibility": "labelListVisibility"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "messageListVisibility",
+          "labelListVisibility"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label_id": {
+            "type": "string",
+            "description": "Label ID to update"
+          },
+          "name": {
+            "type": "string",
+            "description": "New label name"
+          },
+          "message_list_visibility": {
+            "type": "string",
+            "enum": [
+              "show",
+              "hide"
+            ],
+            "description": "New message list visibility"
+          },
+          "label_list_visibility": {
+            "type": "string",
+            "enum": [
+              "labelShow",
+              "labelShowIfUnread",
+              "labelHide"
+            ],
+            "description": "New label list visibility"
+          }
+        },
+        "required": [
+          "label_id"
+        ]
+      }
+    },
+    {
+      "name": "delete_label",
+      "description": "Delete a Gmail label. Messages with this label are not deleted — they just lose the label.",
+      "method": "DELETE",
+      "path": "/labels/:label_id",
+      "response": {
+        "pick": []
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label_id": {
+            "type": "string",
+            "description": "Label ID to delete"
+          }
+        },
+        "required": [
+          "label_id"
+        ]
+      }
+    },
+    {
+      "name": "get_thread",
+      "description": "Retrieve a Gmail thread (conversation) by ID.",
+      "method": "GET",
+      "path": "/threads/:thread_id",
+      "queryMap": {
+        "format": "format"
+      },
+      "response": {
+        "tokenBudget": 5000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "description": "Gmail thread ID"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "full",
+              "metadata",
+              "minimal"
+            ],
+            "description": "Message format in thread (default 'full')"
+          }
+        },
+        "required": [
+          "thread_id"
+        ]
+      }
+    },
+    {
+      "name": "modify_message",
+      "description": "Add or remove labels from a Gmail message (e.g., mark as read, archive, star).",
+      "method": "POST",
+      "path": "/messages/:message_id/modify",
+      "bodyMap": {
+        "addLabelIds": "addLabelIds",
+        "removeLabelIds": "removeLabelIds"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "labelIds"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "Message ID"
+          },
+          "addLabelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Label IDs to add (e.g., ['STARRED', 'IMPORTANT'])"
+          },
+          "removeLabelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Label IDs to remove (e.g., ['UNREAD'] to mark as read)"
+          }
+        },
+        "required": [
+          "message_id"
+        ]
+      }
+    },
+    {
+      "name": "create_draft",
+      "description": "Create a new Gmail draft message without sending it.",
+      "method": "POST",
+      "path": "/drafts",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "Recipient email address(es), comma-separated"
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject"
+          },
+          "body": {
+            "type": "string",
+            "description": "Email body (plain text or HTML)"
+          },
+          "cc": {
+            "type": "string",
+            "description": "CC recipients, comma-separated"
+          },
+          "bcc": {
+            "type": "string",
+            "description": "BCC recipients, comma-separated"
+          },
+          "thread_id": {
+            "type": "string",
+            "description": "Thread ID to create the draft as a reply in"
+          }
+        },
+        "required": [
+          "to",
+          "subject",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "list_drafts",
+      "description": "List all draft messages in the Gmail mailbox.",
+      "method": "GET",
+      "path": "/drafts",
+      "queryMap": {
+        "maxResults": "maxResults",
+        "pageToken": "pageToken",
+        "q": "q"
+      },
+      "response": {
+        "pick": [
+          "drafts",
+          "nextPageToken",
+          "resultSizeEstimate"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "maxResults": {
+            "type": "integer",
+            "description": "Max drafts to return (default 25, max 500)"
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "Page token for pagination"
+          },
+          "q": {
+            "type": "string",
+            "description": "Gmail search query to filter drafts"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_draft",
+      "description": "Retrieve a specific Gmail draft by its draft ID.",
+      "method": "GET",
+      "path": "/drafts/:draft_id",
+      "queryMap": {
+        "format": "format"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "message"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "description": "Draft ID"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "full",
+              "metadata",
+              "minimal",
+              "raw"
+            ],
+            "description": "Format of the returned message (default 'full')"
+          }
+        },
+        "required": [
+          "draft_id"
+        ]
+      }
+    },
+    {
+      "name": "send_draft",
+      "description": "Send an existing Gmail draft. The draft is deleted after sending.",
+      "method": "POST",
+      "path": "/drafts/send",
+      "policy": "require_approval",
+      "bodyMap": {
+        "draft_id": "id"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "labelIds",
+          "threadId"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "description": "Draft ID to send"
+          }
+        },
+        "required": [
+          "draft_id"
+        ]
+      }
+    }
+  ]
+}

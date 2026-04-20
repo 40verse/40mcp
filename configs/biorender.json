@@ -1,0 +1,218 @@
+{
+  "name": "biorender",
+  "usage": {
+    "envVars": [
+      "BIORENDER_API_KEY"
+    ],
+    "setup": "Obtain an API key from your BioRender account settings."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://app.biorender.com/api/v1",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "BIORENDER_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "list_figures",
+      "description": "List all scientific figures in the authenticated BioRender account.",
+      "method": "GET",
+      "path": "/figures",
+      "queryMap": {
+        "page": "page",
+        "per_page": "per_page",
+        "search": "search"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "description",
+          "created_at",
+          "updated_at",
+          "status",
+          "thumbnail_url"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "Page number for pagination"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Results per page (default 25)"
+          },
+          "search": {
+            "type": "string",
+            "description": "Filter figures by title or description"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_figure",
+      "description": "Retrieve details of a specific BioRender figure by ID.",
+      "method": "GET",
+      "path": "/figures/:figure_id",
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "description",
+          "created_at",
+          "updated_at",
+          "status",
+          "thumbnail_url",
+          "export_url",
+          "tags"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "figure_id": {
+            "type": "string",
+            "description": "BioRender figure ID"
+          }
+        },
+        "required": [
+          "figure_id"
+        ]
+      }
+    },
+    {
+      "name": "create_figure",
+      "description": "Create a new scientific figure in BioRender.",
+      "method": "POST",
+      "path": "/figures",
+      "policy": "require_approval",
+      "bodyMap": {
+        "title": "title",
+        "description": "description",
+        "tags": "tags",
+        "template_id": "template_id"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "status",
+          "edit_url"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Figure title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Figure description"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags for categorization"
+          },
+          "template_id": {
+            "type": "string",
+            "description": "Template ID to base the figure on (optional)"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      }
+    },
+    {
+      "name": "export_figure",
+      "description": "Export a BioRender figure to PNG, SVG, or PDF format.",
+      "method": "POST",
+      "path": "/figures/:figure_id/export",
+      "bodyMap": {
+        "format": "format",
+        "resolution": "resolution"
+      },
+      "response": {
+        "pick": [
+          "export_url",
+          "format",
+          "expires_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "figure_id": {
+            "type": "string",
+            "description": "BioRender figure ID"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "png",
+              "svg",
+              "pdf"
+            ],
+            "description": "Export format"
+          },
+          "resolution": {
+            "type": "integer",
+            "description": "Resolution in DPI for PNG exports (default 150)"
+          }
+        },
+        "required": [
+          "figure_id",
+          "format"
+        ]
+      }
+    },
+    {
+      "name": "list_templates",
+      "description": "List available BioRender figure templates.",
+      "method": "GET",
+      "path": "/templates",
+      "queryMap": {
+        "category": "category",
+        "search": "search"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "category",
+          "description",
+          "thumbnail_url"
+        ],
+        "limit": 30,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Filter by category (e.g., cell-biology, immunology)"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search templates by title"
+          }
+        }
+      }
+    }
+  ]
+}

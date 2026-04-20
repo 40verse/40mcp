@@ -1,0 +1,324 @@
+{
+  "name": "procore",
+  "usage": {
+    "envVars": [
+      "PROCORE_ACCESS_TOKEN"
+    ],
+    "scopes": [
+      "project_information:read",
+      "project_information:write",
+      "financial_data:read"
+    ],
+    "setup": "Register an app at https://developers.procore.com and obtain an OAuth 2.0 access token with the required scopes."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://app.procore.com/rest/v1.0",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "PROCORE_ACCESS_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "list_projects",
+      "description": "List Procore construction projects for the authenticated company.",
+      "method": "GET",
+      "path": "/projects",
+      "queryMap": {
+        "company_id": "company_id",
+        "status": "status",
+        "per_page": "per_page",
+        "page": "page"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "status",
+          "start_date",
+          "completion_date",
+          "address",
+          "project_number",
+          "total_value"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "company_id": {
+            "type": "integer",
+            "description": "Procore company ID (required)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Active",
+              "Inactive",
+              "Deleted"
+            ],
+            "description": "Filter by project status (default 'Active')"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Results per page (default 25, max 300)"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number"
+          }
+        },
+        "required": [
+          "company_id"
+        ]
+      }
+    },
+    {
+      "name": "get_project",
+      "description": "Get details of a specific Procore project.",
+      "method": "GET",
+      "path": "/projects/:project_id",
+      "queryMap": {
+        "company_id": "company_id"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "status",
+          "description",
+          "start_date",
+          "completion_date",
+          "address",
+          "project_number",
+          "total_value",
+          "project_type",
+          "owner_type"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "description": "Procore project ID"
+          },
+          "company_id": {
+            "type": "integer",
+            "description": "Procore company ID"
+          }
+        },
+        "required": [
+          "project_id",
+          "company_id"
+        ]
+      }
+    },
+    {
+      "name": "list_rfis",
+      "description": "List RFIs (Requests for Information) for a Procore project.",
+      "method": "GET",
+      "path": "/projects/:project_id/rfis",
+      "queryMap": {
+        "status": "status",
+        "per_page": "per_page",
+        "page": "page"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "number",
+          "subject",
+          "status",
+          "due_date",
+          "assignee",
+          "created_at",
+          "updated_at"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "description": "Procore project ID"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "draft"
+            ],
+            "description": "Filter by RFI status"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Results per page"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number"
+          }
+        },
+        "required": [
+          "project_id"
+        ]
+      }
+    },
+    {
+      "name": "list_submittals",
+      "description": "List submittals for a Procore project.",
+      "method": "GET",
+      "path": "/projects/:project_id/submittals",
+      "queryMap": {
+        "status": "status",
+        "per_page": "per_page",
+        "page": "page"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "number",
+          "title",
+          "status",
+          "spec_section",
+          "due_date",
+          "submitted_at",
+          "revision"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "description": "Procore project ID"
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by submittal status (e.g., 'open', 'approved', 'revise_and_resubmit')"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Results per page"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number"
+          }
+        },
+        "required": [
+          "project_id"
+        ]
+      }
+    },
+    {
+      "name": "list_daily_logs",
+      "description": "List daily construction log entries for a Procore project.",
+      "method": "GET",
+      "path": "/projects/:project_id/daily_logs",
+      "queryMap": {
+        "log_date": "log_date",
+        "per_page": "per_page",
+        "page": "page"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "log_date",
+          "created_by",
+          "weather",
+          "manpower_logs",
+          "delay_logs",
+          "notes"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "description": "Procore project ID"
+          },
+          "log_date": {
+            "type": "string",
+            "description": "Filter to a specific date (YYYY-MM-DD)"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Results per page"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number"
+          }
+        },
+        "required": [
+          "project_id"
+        ]
+      }
+    },
+    {
+      "name": "list_documents",
+      "description": "List documents in a Procore project's document management system.",
+      "method": "GET",
+      "path": "/projects/:project_id/documents",
+      "queryMap": {
+        "search": "search",
+        "per_page": "per_page",
+        "page": "page"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "file_type",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "folder"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "description": "Procore project ID"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search documents by filename"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Results per page"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number"
+          }
+        },
+        "required": [
+          "project_id"
+        ]
+      }
+    }
+  ]
+}

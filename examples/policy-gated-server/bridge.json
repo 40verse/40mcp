@@ -1,0 +1,53 @@
+{
+  "name": "policy-gated-user-api",
+  "version": "1.0.0",
+  "baseUrl": "https://api.example.com",
+  "auth": { "type": "bearer", "envVar": "API_TOKEN" },
+  "tools": [
+    {
+      "name": "list_users",
+      "description": "List all users in the system.",
+      "method": "GET",
+      "path": "/users",
+      "policy": "allow",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer", "description": "Page number (default: 1)" },
+          "limit": { "type": "integer", "description": "Results per page (default: 20, max: 100)" }
+        }
+      }
+    },
+    {
+      "name": "update_user",
+      "description": "Update a user's profile fields.",
+      "method": "PATCH",
+      "path": "/users/:user_id",
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": { "type": "string", "description": "User ID to update" },
+          "name": { "type": "string", "description": "New display name" },
+          "email": { "type": "string", "format": "email", "description": "New email address" },
+          "role": { "type": "string", "enum": ["viewer", "editor", "admin"], "description": "New role" }
+        },
+        "required": ["user_id"]
+      }
+    },
+    {
+      "name": "delete_user",
+      "description": "Permanently delete a user account. This action cannot be undone.",
+      "method": "DELETE",
+      "path": "/users/:user_id",
+      "policy": "deny",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": { "type": "string", "description": "User ID to delete" }
+        },
+        "required": ["user_id"]
+      }
+    }
+  ]
+}

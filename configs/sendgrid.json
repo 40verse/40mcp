@@ -1,0 +1,315 @@
+{
+  "name": "sendgrid",
+  "usage": {
+    "envVars": [
+      "SENDGRID_API_KEY"
+    ],
+    "scopes": [
+      "Mail Send",
+      "Suppressions",
+      "Stats",
+      "Marketing"
+    ],
+    "setup": "Create an API key at https://app.sendgrid.com/settings/api_keys with the required permissions."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.sendgrid.com/v3",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "SENDGRID_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "send_email",
+      "description": "Send a transactional email via SendGrid. Supports plain text and HTML content.",
+      "method": "POST",
+      "path": "/mail/send",
+      "bodyMap": {
+        "to_email": "personalizations[0].to[0].email",
+        "to_name": "personalizations[0].to[0].name",
+        "from_email": "from.email",
+        "from_name": "from.name",
+        "subject": "subject",
+        "text_content": "content[0].value",
+        "html_content": "content[1].value",
+        "template_id": "template_id",
+        "reply_to_email": "reply_to.email"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to_email": {
+            "type": "string",
+            "description": "Recipient email address"
+          },
+          "to_name": {
+            "type": "string",
+            "description": "Recipient display name"
+          },
+          "from_email": {
+            "type": "string",
+            "description": "Verified sender email address"
+          },
+          "from_name": {
+            "type": "string",
+            "description": "Sender display name"
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject line"
+          },
+          "text_content": {
+            "type": "string",
+            "description": "Plain text email body"
+          },
+          "html_content": {
+            "type": "string",
+            "description": "HTML email body"
+          },
+          "template_id": {
+            "type": "string",
+            "description": "SendGrid dynamic template ID (d-...) — use instead of content if templating"
+          },
+          "reply_to_email": {
+            "type": "string",
+            "description": "Reply-to email address"
+          }
+        },
+        "required": [
+          "to_email",
+          "from_email",
+          "subject"
+        ]
+      }
+    },
+    {
+      "name": "list_templates",
+      "description": "List all dynamic email templates in the account.",
+      "method": "GET",
+      "path": "/templates",
+      "queryMap": {
+        "generation": "generation",
+        "page_size": "page_size"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "generation",
+          "updated_at"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "generation": {
+            "type": "string",
+            "enum": [
+              "legacy",
+              "dynamic"
+            ],
+            "description": "Filter by template generation (use 'dynamic' for modern templates)"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Number of results per page (max 200)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_template",
+      "description": "Retrieve a specific email template and its versions by template ID.",
+      "method": "GET",
+      "path": "/templates/:template_id",
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "generation",
+          "versions"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "description": "SendGrid template ID (d-...)"
+          }
+        },
+        "required": [
+          "template_id"
+        ]
+      }
+    },
+    {
+      "name": "list_bounces",
+      "description": "List email addresses that have bounced, causing delivery failures.",
+      "method": "GET",
+      "path": "/suppression/bounces",
+      "queryMap": {
+        "start_time": "start_time",
+        "end_time": "end_time",
+        "max_results": "limit",
+        "offset": "offset"
+      },
+      "response": {
+        "pick": [
+          "email",
+          "status",
+          "reason",
+          "created"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start_time": {
+            "type": "integer",
+            "description": "Start of time range as UNIX timestamp"
+          },
+          "end_time": {
+            "type": "integer",
+            "description": "End of time range as UNIX timestamp"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max bounces to return"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Pagination offset"
+          }
+        }
+      }
+    },
+    {
+      "name": "delete_bounce",
+      "description": "Remove an email address from the bounce suppression list so future sends are attempted.",
+      "method": "DELETE",
+      "path": "/suppression/bounces/:email",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to remove from the bounce list"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      }
+    },
+    {
+      "name": "list_contacts",
+      "description": "List all marketing contacts stored in the SendGrid Marketing Contacts database.",
+      "method": "GET",
+      "path": "/marketing/contacts",
+      "response": {
+        "pick": [
+          "contact_count",
+          "result"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_stats",
+      "description": "Retrieve email send statistics (delivered, opens, clicks, bounces) for a date range.",
+      "method": "GET",
+      "path": "/stats",
+      "queryMap": {
+        "start_date": "start_date",
+        "end_date": "end_date",
+        "aggregated_by": "aggregated_by"
+      },
+      "response": {
+        "pick": [
+          "date",
+          "stats"
+        ],
+        "limit": 30,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "description": "Start date in YYYY-MM-DD format"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "End date in YYYY-MM-DD format"
+          },
+          "aggregated_by": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "description": "Aggregate stats by this time unit"
+          }
+        },
+        "required": [
+          "start_date"
+        ]
+      }
+    },
+    {
+      "name": "list_unsubscribes",
+      "description": "List email addresses that have globally unsubscribed from all emails.",
+      "method": "GET",
+      "path": "/suppression/unsubscribes",
+      "queryMap": {
+        "start_time": "start_time",
+        "end_time": "end_time",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "email",
+          "created"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start_time": {
+            "type": "integer",
+            "description": "Start of time range as UNIX timestamp"
+          },
+          "end_time": {
+            "type": "integer",
+            "description": "End of time range as UNIX timestamp"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results to return"
+          }
+        }
+      }
+    }
+  ]
+}

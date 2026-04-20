@@ -1,0 +1,1164 @@
+{
+  "name": "github",
+  "usage": {
+    "envVars": [
+      "GITHUB_TOKEN"
+    ],
+    "scopes": [
+      "repo",
+      "user",
+      "read:org"
+    ],
+    "setup": "Create a personal access token (classic) or fine-grained token at https://github.com/settings/tokens with the scopes above."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.github.com",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "GITHUB_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "list_repos",
+      "description": "List repositories for the authenticated user.",
+      "method": "GET",
+      "path": "/user/repos",
+      "queryMap": {
+        "sort_by": "sort",
+        "sort_direction": "direction",
+        "repo_type": "type"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "full_name",
+          "description",
+          "html_url",
+          "language",
+          "stargazers_count",
+          "updated_at"
+        ],
+        "limit": 30,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "pushed",
+              "full_name"
+            ],
+            "description": "Sort field"
+          },
+          "sort_direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction"
+          },
+          "repo_type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "owner",
+              "public",
+              "private",
+              "member"
+            ],
+            "description": "Repository type filter"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_repo",
+      "description": "Get details of a specific repository.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo",
+      "response": {
+        "pick": [
+          "id",
+          "full_name",
+          "description",
+          "html_url",
+          "language",
+          "stargazers_count",
+          "forks_count",
+          "open_issues_count",
+          "default_branch",
+          "created_at",
+          "updated_at"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner (user or org)"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          }
+        },
+        "required": [
+          "owner",
+          "repo"
+        ]
+      }
+    },
+    {
+      "name": "get_file_contents",
+      "description": "Get the contents of a file or directory in a repository.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/contents/:path",
+      "queryMap": {
+        "ref": "ref"
+      },
+      "response": {
+        "pick": [
+          "name",
+          "path",
+          "type",
+          "content",
+          "encoding",
+          "size",
+          "sha",
+          "html_url"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "path": {
+            "type": "string",
+            "description": "File or directory path within the repository"
+          },
+          "ref": {
+            "type": "string",
+            "description": "Branch, tag, or commit SHA (defaults to default branch)"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "list_issues",
+      "description": "List issues for a repository.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/issues",
+      "queryMap": {
+        "issue_state": "state",
+        "label_filter": "labels",
+        "sort_by": "sort"
+      },
+      "response": {
+        "pick": [
+          "number",
+          "title",
+          "state",
+          "user.login",
+          "labels",
+          "created_at",
+          "updated_at"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "issue_state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "all"
+            ],
+            "description": "Issue state filter"
+          },
+          "label_filter": {
+            "type": "string",
+            "description": "Comma-separated label names"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "comments"
+            ],
+            "description": "Sort field"
+          }
+        },
+        "required": [
+          "owner",
+          "repo"
+        ]
+      }
+    },
+    {
+      "name": "get_issue",
+      "description": "Get a specific issue by number.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/issues/:issue_number",
+      "response": {
+        "pick": [
+          "number",
+          "title",
+          "state",
+          "body",
+          "user.login",
+          "labels",
+          "assignees",
+          "created_at",
+          "updated_at",
+          "html_url"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "issue_number": {
+            "type": "integer",
+            "description": "Issue number"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "issue_number"
+        ]
+      }
+    },
+    {
+      "name": "create_issue",
+      "description": "Create a new issue in a repository.",
+      "method": "POST",
+      "path": "/repos/:owner/:repo/issues",
+      "bodyMap": {
+        "issue_title": "title",
+        "issue_body": "body",
+        "label_names": "labels",
+        "assignee_logins": "assignees"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "issue_title": {
+            "type": "string",
+            "description": "Issue title"
+          },
+          "issue_body": {
+            "type": "string",
+            "description": "Issue body (markdown)"
+          },
+          "label_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Labels to apply"
+          },
+          "assignee_logins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Assignee usernames"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "issue_title"
+        ]
+      }
+    },
+    {
+      "name": "update_issue",
+      "description": "Update an issue (change state, title, body, labels, or assignees).",
+      "method": "PATCH",
+      "path": "/repos/:owner/:repo/issues/:issue_number",
+      "bodyMap": {
+        "new_title": "title",
+        "new_body": "body",
+        "new_state": "state",
+        "label_names": "labels",
+        "assignee_logins": "assignees"
+      },
+      "response": {
+        "pick": [
+          "number",
+          "title",
+          "state",
+          "html_url"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "issue_number": {
+            "type": "integer",
+            "description": "Issue number to update"
+          },
+          "new_title": {
+            "type": "string",
+            "description": "New title"
+          },
+          "new_body": {
+            "type": "string",
+            "description": "New body (markdown)"
+          },
+          "new_state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "description": "New state"
+          },
+          "label_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Replacement label set"
+          },
+          "assignee_logins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Replacement assignee set"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "issue_number"
+        ]
+      }
+    },
+    {
+      "name": "add_issue_comment",
+      "description": "Add a comment to an issue or pull request.",
+      "method": "POST",
+      "path": "/repos/:owner/:repo/issues/:issue_number/comments",
+      "bodyMap": {
+        "comment_body": "body"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "html_url",
+          "created_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "issue_number": {
+            "type": "integer",
+            "description": "Issue or PR number"
+          },
+          "comment_body": {
+            "type": "string",
+            "description": "Comment body (markdown)"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "issue_number",
+          "comment_body"
+        ]
+      }
+    },
+    {
+      "name": "list_pull_requests",
+      "description": "List pull requests for a repository.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls",
+      "queryMap": {
+        "pr_state": "state",
+        "sort_by": "sort",
+        "sort_direction": "direction"
+      },
+      "response": {
+        "pick": [
+          "number",
+          "title",
+          "state",
+          "user.login",
+          "head.ref",
+          "base.ref",
+          "created_at"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "pr_state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "all"
+            ],
+            "description": "PR state filter"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "popularity",
+              "long-running"
+            ],
+            "description": "Sort field"
+          },
+          "sort_direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          }
+        },
+        "required": [
+          "owner",
+          "repo"
+        ]
+      }
+    },
+    {
+      "name": "get_pull_request",
+      "description": "Get details of a specific pull request.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls/:pull_number",
+      "response": {
+        "pick": [
+          "number",
+          "title",
+          "state",
+          "body",
+          "user.login",
+          "head.ref",
+          "base.ref",
+          "mergeable",
+          "merged",
+          "additions",
+          "deletions",
+          "changed_files",
+          "html_url",
+          "created_at"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "pull_number": {
+            "type": "integer",
+            "description": "Pull request number"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "pull_number"
+        ]
+      }
+    },
+    {
+      "name": "create_pull_request",
+      "description": "Create a new pull request.",
+      "method": "POST",
+      "path": "/repos/:owner/:repo/pulls",
+      "bodyMap": {
+        "pr_title": "title",
+        "pr_body": "body",
+        "head_branch": "head",
+        "base_branch": "base",
+        "is_draft": "draft"
+      },
+      "response": {
+        "pick": [
+          "number",
+          "html_url",
+          "state",
+          "created_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "pr_title": {
+            "type": "string",
+            "description": "PR title"
+          },
+          "pr_body": {
+            "type": "string",
+            "description": "PR description (markdown)"
+          },
+          "head_branch": {
+            "type": "string",
+            "description": "Branch containing changes (format: owner:branch for forks)"
+          },
+          "base_branch": {
+            "type": "string",
+            "description": "Branch to merge into"
+          },
+          "is_draft": {
+            "type": "boolean",
+            "description": "Open as a draft PR"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "pr_title",
+          "head_branch",
+          "base_branch"
+        ]
+      }
+    },
+    {
+      "name": "merge_pull_request",
+      "policy": "require_approval",
+      "description": "Merge an open pull request.",
+      "method": "PUT",
+      "path": "/repos/:owner/:repo/pulls/:pull_number/merge",
+      "bodyMap": {
+        "merge_message": "commit_message",
+        "merge_method": "merge_method"
+      },
+      "response": {
+        "pick": [
+          "merged",
+          "message",
+          "sha"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "pull_number": {
+            "type": "integer",
+            "description": "Pull request number"
+          },
+          "merge_method": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "squash",
+              "rebase"
+            ],
+            "description": "Merge strategy"
+          },
+          "merge_message": {
+            "type": "string",
+            "description": "Optional commit message"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "pull_number"
+        ]
+      }
+    },
+    {
+      "name": "list_branches",
+      "description": "List branches in a repository.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/branches",
+      "queryMap": {
+        "protected_only": "protected",
+        "max_results": "per_page"
+      },
+      "response": {
+        "pick": [
+          "name",
+          "commit.sha",
+          "protected"
+        ],
+        "limit": 30,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "protected_only": {
+            "type": "boolean",
+            "description": "List only protected branches"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results per page (1-100)"
+          }
+        },
+        "required": [
+          "owner",
+          "repo"
+        ]
+      }
+    },
+    {
+      "name": "list_commits",
+      "description": "List commits on a repository branch.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/commits",
+      "queryMap": {
+        "on_branch": "sha",
+        "path_filter": "path",
+        "author_filter": "author",
+        "max_results": "per_page"
+      },
+      "response": {
+        "pick": [
+          "sha",
+          "commit.message",
+          "commit.author.name",
+          "commit.author.date",
+          "html_url"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "on_branch": {
+            "type": "string",
+            "description": "Branch name or commit SHA to start from"
+          },
+          "path_filter": {
+            "type": "string",
+            "description": "Only commits touching this file path"
+          },
+          "author_filter": {
+            "type": "string",
+            "description": "Filter by author username or email"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results per page (1-100)"
+          }
+        },
+        "required": [
+          "owner",
+          "repo"
+        ]
+      }
+    },
+    {
+      "name": "get_commit",
+      "description": "Get details of a specific commit including diff stats.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/commits/:ref",
+      "response": {
+        "pick": [
+          "sha",
+          "commit.message",
+          "commit.author",
+          "stats",
+          "files",
+          "html_url"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "ref": {
+            "type": "string",
+            "description": "Commit SHA, branch, or tag"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "ref"
+        ]
+      }
+    },
+    {
+      "name": "list_releases",
+      "description": "List releases for a repository.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/releases",
+      "queryMap": {
+        "max_results": "per_page"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "tag_name",
+          "name",
+          "draft",
+          "prerelease",
+          "published_at",
+          "html_url"
+        ],
+        "limit": 15,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results per page (1-100)"
+          }
+        },
+        "required": [
+          "owner",
+          "repo"
+        ]
+      }
+    },
+    {
+      "name": "create_release",
+      "description": "Create a new release for a repository.",
+      "method": "POST",
+      "path": "/repos/:owner/:repo/releases",
+      "bodyMap": {
+        "tag": "tag_name",
+        "release_name": "name",
+        "release_body": "body",
+        "is_draft": "draft",
+        "is_prerelease": "prerelease",
+        "target_commitish": "target_commitish"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "tag_name",
+          "name",
+          "html_url",
+          "published_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "tag": {
+            "type": "string",
+            "description": "Tag name (e.g. v1.0.0)"
+          },
+          "release_name": {
+            "type": "string",
+            "description": "Release title"
+          },
+          "release_body": {
+            "type": "string",
+            "description": "Release notes (markdown)"
+          },
+          "target_commitish": {
+            "type": "string",
+            "description": "Branch or commit SHA to tag. Defaults to default branch."
+          },
+          "is_draft": {
+            "type": "boolean",
+            "description": "Create as a draft release"
+          },
+          "is_prerelease": {
+            "type": "boolean",
+            "description": "Mark as a pre-release"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "tag"
+        ]
+      }
+    },
+    {
+      "name": "list_workflow_runs",
+      "description": "List GitHub Actions workflow runs for a repository.",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/actions/runs",
+      "queryMap": {
+        "run_status": "status",
+        "branch_filter": "branch",
+        "max_results": "per_page"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "status",
+          "conclusion",
+          "head_branch",
+          "event",
+          "created_at",
+          "html_url"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name"
+          },
+          "run_status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress",
+              "completed",
+              "waiting",
+              "requested",
+              "pending"
+            ],
+            "description": "Filter by run status"
+          },
+          "branch_filter": {
+            "type": "string",
+            "description": "Filter by branch name"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results per page (1-100)"
+          }
+        },
+        "required": [
+          "owner",
+          "repo"
+        ]
+      }
+    },
+    {
+      "name": "get_user",
+      "description": "Get a GitHub user's public profile.",
+      "method": "GET",
+      "path": "/users/:username",
+      "response": {
+        "pick": [
+          "login",
+          "name",
+          "bio",
+          "company",
+          "location",
+          "public_repos",
+          "followers",
+          "following",
+          "html_url",
+          "created_at"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "GitHub username"
+          }
+        },
+        "required": [
+          "username"
+        ]
+      }
+    },
+    {
+      "name": "search_repos",
+      "description": "Search GitHub repositories.",
+      "method": "GET",
+      "path": "/search/repositories",
+      "queryMap": {
+        "search_query": "q",
+        "sort_by": "sort",
+        "sort_order": "order"
+      },
+      "response": {
+        "pick": [
+          "total_count",
+          "items"
+        ],
+        "template": "{full_name} ({stargazers_count} stars) — {description}",
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search_query": {
+            "type": "string",
+            "description": "Search query (GitHub search syntax)"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "stars",
+              "forks",
+              "help-wanted-issues",
+              "updated"
+            ],
+            "description": "Sort field"
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          }
+        },
+        "required": [
+          "search_query"
+        ]
+      }
+    },
+    {
+      "name": "search_issues",
+      "description": "Search GitHub issues and pull requests across all repositories.",
+      "method": "GET",
+      "path": "/search/issues",
+      "queryMap": {
+        "search_query": "q",
+        "sort_by": "sort",
+        "sort_order": "order",
+        "max_results": "per_page"
+      },
+      "response": {
+        "pick": [
+          "total_count",
+          "items"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search_query": {
+            "type": "string",
+            "description": "Search query (GitHub search syntax, e.g. 'is:issue is:open label:bug')"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "comments",
+              "reactions",
+              "created",
+              "updated"
+            ],
+            "description": "Sort field"
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results per page (1-100)"
+          }
+        },
+        "required": [
+          "search_query"
+        ]
+      }
+    },
+    {
+      "name": "search_code",
+      "description": "Search code across GitHub repositories.",
+      "method": "GET",
+      "path": "/search/code",
+      "queryMap": {
+        "search_query": "q",
+        "sort_by": "sort",
+        "max_results": "per_page"
+      },
+      "response": {
+        "pick": [
+          "total_count",
+          "items"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search_query": {
+            "type": "string",
+            "description": "Search query (e.g. 'addClass in:file language:js repo:jquery/jquery')"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "indexed"
+            ],
+            "description": "Sort field"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results per page (1-100)"
+          }
+        },
+        "required": [
+          "search_query"
+        ]
+      }
+    }
+  ]
+}

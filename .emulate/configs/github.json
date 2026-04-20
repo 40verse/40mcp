@@ -1,0 +1,112 @@
+{
+  "_comment": "40mcp × emulate — points to local emulate GitHub server (port 4001). Run: npx emulate --service github --seed ../.emulate/emulate.config.yaml",
+  "name": "github-emulate",
+  "version": "1.0.0",
+  "baseUrl": "http://localhost:4001",
+  "auth": {
+    "type": "bearer",
+    "envVar": "GITHUB_TOKEN",
+    "_note": "Any non-empty string works — emulate does not validate tokens"
+  },
+  "tools": [
+    {
+      "name": "list_repos",
+      "description": "List repositories for the authenticated user (emulated).",
+      "method": "GET",
+      "path": "/user/repos",
+      "queryMap": { "sort_by": "sort", "sort_direction": "direction", "repo_type": "type" },
+      "response": { "pick": ["id", "full_name", "description", "html_url", "language", "stargazers_count", "updated_at"], "limit": 30, "summary": true },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sort_by": { "type": "string", "enum": ["created", "updated", "pushed", "full_name"], "description": "Sort field" },
+          "sort_direction": { "type": "string", "enum": ["asc", "desc"], "description": "Sort direction" },
+          "repo_type": { "type": "string", "enum": ["all", "owner", "public", "private", "member"], "description": "Repository type filter" }
+        }
+      }
+    },
+    {
+      "name": "get_repo",
+      "description": "Get details of a specific repository (emulated).",
+      "method": "GET",
+      "path": "/repos/:owner/:repo",
+      "response": { "pick": ["id", "full_name", "description", "html_url", "language", "stargazers_count", "forks_count", "open_issues_count", "default_branch", "created_at", "updated_at"] },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": { "type": "string", "description": "Repository owner" },
+          "repo": { "type": "string", "description": "Repository name" }
+        },
+        "required": ["owner", "repo"]
+      }
+    },
+    {
+      "name": "list_issues",
+      "description": "List issues for a repository (emulated).",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/issues",
+      "queryMap": { "issue_state": "state", "label_filter": "labels", "sort_by": "sort" },
+      "response": { "pick": ["number", "title", "state", "user.login", "labels", "created_at", "updated_at"], "limit": 25, "summary": true },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": { "type": "string", "description": "Repository owner" },
+          "repo": { "type": "string", "description": "Repository name" },
+          "issue_state": { "type": "string", "enum": ["open", "closed", "all"], "description": "Issue state filter" }
+        },
+        "required": ["owner", "repo"]
+      }
+    },
+    {
+      "name": "create_issue",
+      "description": "Create a new issue in a repository (emulated — writes to local state).",
+      "method": "POST",
+      "path": "/repos/:owner/:repo/issues",
+      "bodyMap": { "issue_title": "title", "issue_body": "body", "label_names": "labels" },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": { "type": "string", "description": "Repository owner" },
+          "repo": { "type": "string", "description": "Repository name" },
+          "issue_title": { "type": "string", "description": "Issue title" },
+          "issue_body": { "type": "string", "description": "Issue body (markdown)" },
+          "label_names": { "type": "array", "items": { "type": "string" }, "description": "Labels to apply" }
+        },
+        "required": ["owner", "repo", "issue_title"]
+      }
+    },
+    {
+      "name": "list_pull_requests",
+      "description": "List pull requests for a repository (emulated).",
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls",
+      "queryMap": { "pr_state": "state", "sort_by": "sort" },
+      "response": { "pick": ["number", "title", "state", "user.login", "head.ref", "base.ref", "created_at"], "limit": 25, "summary": true },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": { "type": "string", "description": "Repository owner" },
+          "repo": { "type": "string", "description": "Repository name" },
+          "pr_state": { "type": "string", "enum": ["open", "closed", "all"], "description": "PR state filter" }
+        },
+        "required": ["owner", "repo"]
+      }
+    },
+    {
+      "name": "search_repos",
+      "description": "Search GitHub repositories (emulated).",
+      "method": "GET",
+      "path": "/search/repositories",
+      "queryMap": { "search_query": "q", "sort_by": "sort" },
+      "response": { "pick": ["total_count", "items"], "limit": 10 },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search_query": { "type": "string", "description": "Search query" },
+          "sort_by": { "type": "string", "enum": ["stars", "forks", "updated"], "description": "Sort field" }
+        },
+        "required": ["search_query"]
+      }
+    }
+  ]
+}

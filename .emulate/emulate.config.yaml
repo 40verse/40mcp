@@ -1,0 +1,133 @@
+# 40mcp × emulate — seed configuration
+#
+# This file seeds vercel-labs/emulate with realistic test data
+# that matches the tool shapes in 40mcp's community configs.
+#
+# Start: npx emulate --seed .emulate/emulate.config.yaml
+# Then:  npx 40mcp serve .emulate/configs/github.json   (uses localhost:4001)
+#        npx 40mcp serve .emulate/configs/vercel.json   (uses localhost:4000)
+#        npx 40mcp serve .emulate/configs/slack.json    (uses localhost:4003)
+#
+# No real API keys required. No network calls. Full MCP tool loop, offline.
+
+tokens:
+  dev_token:
+    login: dev
+    scopes: [repo, read:user, read:org, issues, pull_request]
+
+github:
+  users:
+    - login: dev
+      name: Developer
+      email: dev@example.com
+      avatar_url: https://avatars.githubusercontent.com/u/1
+    - login: contributor
+      name: Contributor
+      email: contrib@example.com
+  oauth_apps:
+    - client_id: "Iv1.local40mcp"
+      client_secret: "local-secret-40mcp"
+      redirect_uris:
+        - "http://localhost:3000/api/auth/callback/github"
+  repos:
+    - name: my-app
+      owner: dev
+      description: Test application repository
+      language: TypeScript
+      private: false
+      default_branch: main
+    - name: api-service
+      owner: dev
+      description: Backend API service
+      language: JavaScript
+      private: true
+      default_branch: main
+  issues:
+    - repo: my-app
+      owner: dev
+      title: "Fix authentication flow"
+      body: "The OAuth callback is failing intermittently."
+      state: open
+      labels: [bug, auth]
+    - repo: my-app
+      owner: dev
+      title: "Add dark mode support"
+      body: "Users have requested dark mode."
+      state: open
+      labels: [enhancement]
+  pull_requests:
+    - repo: my-app
+      owner: dev
+      title: "feat: add token refresh logic"
+      body: "Implements automatic token refresh before expiry."
+      head: feat/token-refresh
+      base: main
+      state: open
+
+vercel:
+  users:
+    - username: dev
+      name: Developer
+      email: dev@example.com
+  teams:
+    - slug: my-team
+      name: My Team
+  projects:
+    - name: my-app
+      team: my-team
+      framework: nextjs
+    - name: api-service
+      team: my-team
+      framework: node
+  deployments:
+    - project: my-app
+      team: my-team
+      url: my-app-abc123.vercel.app
+      state: READY
+      branch: main
+    - project: my-app
+      team: my-team
+      url: my-app-preview.vercel.app
+      state: READY
+      branch: feat/dark-mode
+
+slack:
+  team:
+    name: Dev Workspace
+    domain: dev-workspace
+  users:
+    - name: Developer
+      display_name: dev
+      email: dev@example.com
+  channels:
+    - name: general
+      topic: General discussion
+    - name: engineering
+      topic: Engineering team
+    - name: deployments
+      topic: Deployment notifications
+  oauth_apps:
+    - client_id: "12345.local40mcp"
+      client_secret: "local-slack-secret"
+
+google:
+  users:
+    - email: dev@example.com
+      name: Developer
+  oauth_clients:
+    - client_id: local-40mcp.apps.googleusercontent.com
+      client_secret: local-google-secret
+      redirect_uris:
+        - http://localhost:3000/api/auth/callback/google
+
+microsoft:
+  oauth_clients:
+    - client_id: local-40mcp-client-id
+      client_secret: local-microsoft-secret
+
+aws:
+  region: us-east-1
+  s3:
+    buckets:
+      - name: my-app-assets
+      - name: my-app-uploads

@@ -1,0 +1,776 @@
+{
+  "name": "twilio",
+  "usage": {
+    "envVars": [
+      "TWILIO_ACCOUNT_SID",
+      "TWILIO_AUTH_TOKEN"
+    ],
+    "setup": "Find your Account SID and Auth Token in the Twilio Console at https://console.twilio.com. Never expose these in client-side code."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.twilio.com/2010-04-01",
+  "strictSsrf": true,
+  "auth": {
+    "type": "basic",
+    "userEnvVar": "TWILIO_ACCOUNT_SID",
+    "passEnvVar": "TWILIO_AUTH_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "send_sms",
+      "description": "Send an SMS or MMS message from a Twilio phone number to a recipient.",
+      "method": "POST",
+      "path": "/Accounts/:account_sid/Messages.json",
+      "bodyMap": {
+        "to_number": "To",
+        "from_number": "From",
+        "message_body": "Body",
+        "media_url": "MediaUrl"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "to",
+          "from",
+          "body",
+          "status",
+          "direction",
+          "date_created",
+          "error_code",
+          "error_message"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID (starts with AC)"
+          },
+          "to_number": {
+            "type": "string",
+            "description": "Destination phone number in E.164 format (e.g. +15551234567)"
+          },
+          "from_number": {
+            "type": "string",
+            "description": "Twilio phone number to send from, in E.164 format"
+          },
+          "message_body": {
+            "type": "string",
+            "description": "Text body of the SMS (max 1600 chars)"
+          },
+          "media_url": {
+            "type": "string",
+            "description": "Publicly accessible URL of media to attach (MMS)"
+          }
+        },
+        "required": [
+          "account_sid",
+          "to_number",
+          "from_number",
+          "message_body"
+        ]
+      }
+    },
+    {
+      "name": "list_messages",
+      "description": "List SMS/MMS messages sent or received on the account, with optional filters.",
+      "method": "GET",
+      "path": "/Accounts/:account_sid/Messages.json",
+      "queryMap": {
+        "to_number": "To",
+        "from_number": "From",
+        "date_sent": "DateSent",
+        "max_results": "PageSize"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "to",
+          "from",
+          "body",
+          "status",
+          "direction",
+          "date_created",
+          "price"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "to_number": {
+            "type": "string",
+            "description": "Filter messages sent to this phone number"
+          },
+          "from_number": {
+            "type": "string",
+            "description": "Filter messages sent from this phone number"
+          },
+          "date_sent": {
+            "type": "string",
+            "description": "Filter by date sent (YYYY-MM-DD)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max messages to return (1-1000, default 25)"
+          }
+        },
+        "required": [
+          "account_sid"
+        ]
+      }
+    },
+    {
+      "name": "get_message",
+      "description": "Retrieve details of a specific message by its SID.",
+      "method": "GET",
+      "path": "/Accounts/:account_sid/Messages/:message_sid.json",
+      "response": {
+        "pick": [
+          "sid",
+          "to",
+          "from",
+          "body",
+          "status",
+          "direction",
+          "date_created",
+          "date_updated",
+          "price",
+          "price_unit",
+          "error_code",
+          "error_message",
+          "num_segments"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "message_sid": {
+            "type": "string",
+            "description": "Message SID (starts with SM or MM)"
+          }
+        },
+        "required": [
+          "account_sid",
+          "message_sid"
+        ]
+      }
+    },
+    {
+      "name": "list_calls",
+      "description": "List voice calls made or received on the account, with optional filters by number or status.",
+      "method": "GET",
+      "path": "/Accounts/:account_sid/Calls.json",
+      "queryMap": {
+        "to_number": "To",
+        "from_number": "From",
+        "call_status": "Status",
+        "max_results": "PageSize"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "to",
+          "from",
+          "status",
+          "direction",
+          "duration",
+          "start_time",
+          "end_time",
+          "price"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "to_number": {
+            "type": "string",
+            "description": "Filter calls to this number"
+          },
+          "from_number": {
+            "type": "string",
+            "description": "Filter calls from this number"
+          },
+          "call_status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "ringing",
+              "in-progress",
+              "canceled",
+              "completed",
+              "failed",
+              "busy",
+              "no-answer"
+            ],
+            "description": "Filter by call status"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max calls to return (1-1000, default 25)"
+          }
+        },
+        "required": [
+          "account_sid"
+        ]
+      }
+    },
+    {
+      "name": "get_call",
+      "description": "Retrieve details of a specific voice call by its SID.",
+      "method": "GET",
+      "path": "/Accounts/:account_sid/Calls/:call_sid.json",
+      "response": {
+        "pick": [
+          "sid",
+          "to",
+          "from",
+          "status",
+          "direction",
+          "duration",
+          "start_time",
+          "end_time",
+          "price",
+          "price_unit",
+          "answered_by",
+          "forwarded_from"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "call_sid": {
+            "type": "string",
+            "description": "Call SID (starts with CA)"
+          }
+        },
+        "required": [
+          "account_sid",
+          "call_sid"
+        ]
+      }
+    },
+    {
+      "name": "make_call",
+      "description": "Initiate an outbound voice call from a Twilio number. Requires a TwiML URL or ApplicationSid to control call flow.",
+      "method": "POST",
+      "path": "/Accounts/:account_sid/Calls.json",
+      "bodyMap": {
+        "to_number": "To",
+        "from_number": "From",
+        "url": "Url",
+        "application_sid": "ApplicationSid",
+        "method": "Method",
+        "status_callback": "StatusCallback",
+        "timeout": "Timeout"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "to",
+          "from",
+          "status",
+          "direction",
+          "date_created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "to_number": {
+            "type": "string",
+            "description": "Phone number to call in E.164 format"
+          },
+          "from_number": {
+            "type": "string",
+            "description": "Twilio phone number to call from"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL that returns TwiML instructions for the call"
+          },
+          "application_sid": {
+            "type": "string",
+            "description": "TwiML Application SID (alternative to url)"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "HTTP method for the TwiML URL (default POST)"
+          },
+          "status_callback": {
+            "type": "string",
+            "description": "URL for call status webhooks"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Seconds to wait for answer before giving up (default 60)"
+          }
+        },
+        "required": [
+          "account_sid",
+          "to_number",
+          "from_number",
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "cancel_call",
+      "description": "Cancel a queued or ringing outbound call before it is connected.",
+      "method": "POST",
+      "path": "/Accounts/:account_sid/Calls/:call_sid.json",
+      "bodyMap": {
+        "status": "Status"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "status",
+          "to",
+          "from",
+          "date_updated"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "call_sid": {
+            "type": "string",
+            "description": "Call SID to cancel (must be in queued or ringing state)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "canceled"
+            ],
+            "description": "Must be 'canceled' to cancel the call"
+          }
+        },
+        "required": [
+          "account_sid",
+          "call_sid",
+          "status"
+        ]
+      }
+    },
+    {
+      "name": "get_recording",
+      "description": "Retrieve metadata for a specific call recording by its SID.",
+      "method": "GET",
+      "path": "/Accounts/:account_sid/Recordings/:recording_sid.json",
+      "response": {
+        "pick": [
+          "sid",
+          "call_sid",
+          "duration",
+          "status",
+          "channels",
+          "date_created",
+          "media_url",
+          "price"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "recording_sid": {
+            "type": "string",
+            "description": "Recording SID (starts with RE)"
+          }
+        },
+        "required": [
+          "account_sid",
+          "recording_sid"
+        ]
+      }
+    },
+    {
+      "name": "list_recordings",
+      "description": "List call recordings for the account, optionally filtered by call SID or date.",
+      "method": "GET",
+      "path": "/Accounts/:account_sid/Recordings.json",
+      "queryMap": {
+        "call_sid": "CallSid",
+        "date_created": "DateCreated",
+        "max_results": "PageSize"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "call_sid",
+          "duration",
+          "status",
+          "date_created",
+          "media_url"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "call_sid": {
+            "type": "string",
+            "description": "Filter recordings from this call SID"
+          },
+          "date_created": {
+            "type": "string",
+            "description": "Filter recordings by date (YYYY-MM-DD)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max recordings to return"
+          }
+        },
+        "required": [
+          "account_sid"
+        ]
+      }
+    },
+    {
+      "name": "create_verify_service",
+      "description": "Create a new Twilio Verify service for phone verification (SMS or voice OTP).",
+      "method": "POST",
+      "path": "/Services",
+      "bodyMap": {
+        "friendly_name": "FriendlyName",
+        "code_length": "CodeLength",
+        "lookup_enabled": "LookupEnabled"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "friendly_name",
+          "code_length",
+          "date_created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "friendly_name": {
+            "type": "string",
+            "description": "Human-readable name for the verify service"
+          },
+          "code_length": {
+            "type": "integer",
+            "description": "Length of the OTP code (4-10, default 6)"
+          },
+          "lookup_enabled": {
+            "type": "boolean",
+            "description": "Enable carrier lookup for phone number validation"
+          }
+        },
+        "required": [
+          "friendly_name"
+        ]
+      }
+    },
+    {
+      "name": "send_verification",
+      "description": "Send a verification code (OTP) to a phone number via SMS, WhatsApp, or voice call using a Twilio Verify service.",
+      "method": "POST",
+      "path": "/Services/:service_sid/Verifications",
+      "bodyMap": {
+        "to_number": "To",
+        "channel": "Channel"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "to",
+          "channel",
+          "status",
+          "valid",
+          "date_created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service_sid": {
+            "type": "string",
+            "description": "Verify Service SID (starts with VA)"
+          },
+          "to_number": {
+            "type": "string",
+            "description": "Phone number to send verification to (E.164 format)"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "sms",
+              "call",
+              "whatsapp"
+            ],
+            "description": "Delivery channel for the OTP"
+          }
+        },
+        "required": [
+          "service_sid",
+          "to_number",
+          "channel"
+        ]
+      }
+    },
+    {
+      "name": "check_verification",
+      "description": "Check whether a user-submitted OTP code is valid for a Twilio Verify verification.",
+      "method": "POST",
+      "path": "/Services/:service_sid/VerificationCheck",
+      "bodyMap": {
+        "to_number": "To",
+        "code": "Code"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "to",
+          "channel",
+          "status",
+          "valid",
+          "date_created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service_sid": {
+            "type": "string",
+            "description": "Verify Service SID (starts with VA)"
+          },
+          "to_number": {
+            "type": "string",
+            "description": "Phone number that received the code"
+          },
+          "code": {
+            "type": "string",
+            "description": "The OTP code submitted by the user"
+          }
+        },
+        "required": [
+          "service_sid",
+          "to_number",
+          "code"
+        ]
+      }
+    },
+    {
+      "name": "lookup_phone_number",
+      "description": "Look up information about a phone number including carrier, line type, and caller identity via Twilio Lookup.",
+      "method": "GET",
+      "path": "/PhoneNumbers/:phone_number",
+      "queryMap": {
+        "type": "Type",
+        "fields": "Fields"
+      },
+      "response": {
+        "pick": [
+          "phone_number",
+          "national_format",
+          "country_code",
+          "carrier",
+          "caller_name",
+          "line_type_intelligence"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number": {
+            "type": "string",
+            "description": "Phone number to look up in E.164 format (e.g. +15551234567)"
+          },
+          "type": {
+            "type": "string",
+            "description": "Lookup types to include (e.g. 'carrier', 'caller-name')"
+          },
+          "fields": {
+            "type": "string",
+            "description": "Comma-separated fields for enhanced lookup (e.g. 'line_type_intelligence,caller_name')"
+          }
+        },
+        "required": [
+          "phone_number"
+        ]
+      }
+    },
+    {
+      "name": "list_phone_numbers",
+      "description": "List Twilio phone numbers owned by the account (incoming/purchased numbers).",
+      "method": "GET",
+      "path": "/Accounts/:account_sid/IncomingPhoneNumbers.json",
+      "queryMap": {
+        "phone_number": "PhoneNumber",
+        "friendly_name": "FriendlyName",
+        "max_results": "PageSize"
+      },
+      "response": {
+        "pick": [
+          "sid",
+          "phone_number",
+          "friendly_name",
+          "sms_url",
+          "voice_url",
+          "capabilities",
+          "date_created"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "phone_number": {
+            "type": "string",
+            "description": "Filter by phone number (partial match)"
+          },
+          "friendly_name": {
+            "type": "string",
+            "description": "Filter by friendly name (partial match)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max numbers to return"
+          }
+        },
+        "required": [
+          "account_sid"
+        ]
+      }
+    },
+    {
+      "name": "list_available_numbers",
+      "description": "Search for available Twilio phone numbers to purchase in a given country and area code.",
+      "method": "GET",
+      "path": "/Accounts/:account_sid/AvailablePhoneNumbers/:country_code/Local.json",
+      "queryMap": {
+        "area_code": "AreaCode",
+        "contains": "Contains",
+        "max_results": "PageSize"
+      },
+      "response": {
+        "pick": [
+          "phone_number",
+          "friendly_name",
+          "region",
+          "postal_code",
+          "capabilities"
+        ],
+        "limit": 10,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          },
+          "country_code": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 country code (e.g. US, GB, CA)"
+          },
+          "area_code": {
+            "type": "string",
+            "description": "3-digit area code to search within (US/CA only)"
+          },
+          "contains": {
+            "type": "string",
+            "description": "Pattern the number must contain (digits or wildcards)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max numbers to return"
+          }
+        },
+        "required": [
+          "account_sid",
+          "country_code"
+        ]
+      }
+    },
+    {
+      "name": "get_account",
+      "description": "Retrieve details of the Twilio account including status and friendly name.",
+      "method": "GET",
+      "path": "/Accounts/:account_sid.json",
+      "response": {
+        "pick": [
+          "sid",
+          "friendly_name",
+          "status",
+          "type",
+          "date_created",
+          "owner_account_sid"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_sid": {
+            "type": "string",
+            "description": "Twilio Account SID"
+          }
+        },
+        "required": [
+          "account_sid"
+        ]
+      }
+    }
+  ]
+}

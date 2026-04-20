@@ -1,0 +1,267 @@
+{
+  "name": "outlook",
+  "usage": {
+    "envVars": [
+      "OUTLOOK_ACCESS_TOKEN"
+    ],
+    "scopes": [
+      "Mail.Read",
+      "Mail.Send",
+      "Mail.ReadWrite",
+      "Calendars.Read"
+    ],
+    "setup": "Obtain an OAuth 2.0 access token via Microsoft Identity Platform (https://learn.microsoft.com/en-us/graph/auth/). Register an app in Azure AD, grant the scopes above, and authorize."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://graph.microsoft.com/v1.0/me",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "OUTLOOK_ACCESS_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "search_messages",
+      "description": "Search Outlook/Microsoft 365 email messages using KQL (Keyword Query Language).",
+      "method": "GET",
+      "path": "/messages",
+      "queryMap": {
+        "$search": "$search",
+        "$filter": "$filter",
+        "$top": "$top",
+        "$skip": "$skip",
+        "$orderby": "$orderby",
+        "$select": "$select"
+      },
+      "response": {
+        "pick": [
+          "value",
+          "@odata.nextLink"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "$search": {
+            "type": "string",
+            "description": "KQL search query (e.g., '\"project update\" from:alice')"
+          },
+          "$filter": {
+            "type": "string",
+            "description": "OData filter expression (e.g., 'isRead eq false and receivedDateTime ge 2024-01-01T00:00:00Z')"
+          },
+          "$top": {
+            "type": "integer",
+            "description": "Max messages to return (default 25, max 1000)"
+          },
+          "$skip": {
+            "type": "integer",
+            "description": "Number of messages to skip for pagination"
+          },
+          "$orderby": {
+            "type": "string",
+            "description": "Sort field and direction (e.g., 'receivedDateTime DESC')"
+          },
+          "$select": {
+            "type": "string",
+            "description": "Comma-separated fields to return (e.g., 'subject,from,receivedDateTime,isRead')"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_message",
+      "description": "Get a specific Outlook message by ID, including full body and attachments list.",
+      "method": "GET",
+      "path": "/messages/:message_id",
+      "queryMap": {
+        "$select": "$select"
+      },
+      "response": {
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "Outlook message ID"
+          },
+          "$select": {
+            "type": "string",
+            "description": "Fields to return (default: all)"
+          }
+        },
+        "required": [
+          "message_id"
+        ]
+      }
+    },
+    {
+      "name": "send_message",
+      "description": "Send an email via Outlook/Microsoft 365.",
+      "method": "POST",
+      "path": "/sendMail",
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "Email subject"
+          },
+          "body": {
+            "type": "string",
+            "description": "Email body content"
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "Text",
+              "HTML"
+            ],
+            "description": "Body content type (default 'Text')"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of recipient email addresses"
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "CC recipients"
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "BCC recipients"
+          }
+        },
+        "required": [
+          "subject",
+          "body",
+          "to"
+        ]
+      }
+    },
+    {
+      "name": "list_folders",
+      "description": "List mail folders in the Outlook mailbox.",
+      "method": "GET",
+      "path": "/mailFolders",
+      "queryMap": {
+        "$top": "$top",
+        "includeHiddenFolders": "includeHiddenFolders"
+      },
+      "response": {
+        "pick": [
+          "value"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "$top": {
+            "type": "integer",
+            "description": "Max folders to return"
+          },
+          "includeHiddenFolders": {
+            "type": "boolean",
+            "description": "Include hidden folders (default false)"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_calendar_events",
+      "description": "List calendar events from Outlook calendar within a date range.",
+      "method": "GET",
+      "path": "/calendarView",
+      "queryMap": {
+        "startDateTime": "startDateTime",
+        "endDateTime": "endDateTime",
+        "$top": "$top",
+        "$orderby": "$orderby",
+        "$select": "$select"
+      },
+      "response": {
+        "pick": [
+          "value",
+          "@odata.nextLink"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startDateTime": {
+            "type": "string",
+            "description": "Start of range (ISO 8601, e.g. '2024-01-01T00:00:00Z')"
+          },
+          "endDateTime": {
+            "type": "string",
+            "description": "End of range (ISO 8601)"
+          },
+          "$top": {
+            "type": "integer",
+            "description": "Max events to return (default 25)"
+          },
+          "$orderby": {
+            "type": "string",
+            "description": "Sort order (e.g., 'start/dateTime ASC')"
+          },
+          "$select": {
+            "type": "string",
+            "description": "Fields to return (e.g., 'subject,start,end,organizer,attendees')"
+          }
+        },
+        "required": [
+          "startDateTime",
+          "endDateTime"
+        ]
+      }
+    },
+    {
+      "name": "reply_to_message",
+      "description": "Reply to an Outlook email message.",
+      "method": "POST",
+      "path": "/messages/:message_id/reply",
+      "policy": "require_approval",
+      "bodyMap": {
+        "comment": "comment"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "Message ID to reply to"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Reply body text"
+          }
+        },
+        "required": [
+          "message_id",
+          "comment"
+        ]
+      }
+    }
+  ]
+}

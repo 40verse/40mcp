@@ -1,0 +1,281 @@
+{
+  "name": "discord",
+  "usage": {
+    "envVars": [
+      "DISCORD_BOT_TOKEN"
+    ],
+    "setup": "Create a bot at https://discord.com/developers/applications, add it to your server with required permissions, and copy the bot token."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://discord.com/api/v10",
+  "strictSsrf": true,
+  "auth": {
+    "type": "header",
+    "header": "Authorization",
+    "envVar": "DISCORD_BOT_TOKEN",
+    "prefix": "Bot "
+  },
+  "tools": [
+    {
+      "name": "send_message",
+      "description": "Send a message to a Discord channel. Supports plain text and embeds. The bot must have Send Messages permission in that channel.",
+      "method": "POST",
+      "path": "/channels/:channel_id/messages",
+      "bodyMap": {
+        "content": "content",
+        "embeds": "embeds",
+        "reply_to": "message_reference.message_id"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "channel_id",
+          "author.username",
+          "content",
+          "timestamp",
+          "type"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Discord channel ID (18-19 digit snowflake)"
+          },
+          "content": {
+            "type": "string",
+            "description": "Message text content (max 2000 chars)"
+          },
+          "embeds": {
+            "type": "array",
+            "description": "Array of embed objects with title/description/color/fields"
+          },
+          "reply_to": {
+            "type": "string",
+            "description": "Message ID to reply to (creates a reply thread)"
+          }
+        },
+        "required": [
+          "channel_id"
+        ]
+      }
+    },
+    {
+      "name": "get_channel",
+      "description": "Retrieve details of a Discord channel including type, topic, permissions, and parent category.",
+      "method": "GET",
+      "path": "/channels/:channel_id",
+      "response": {
+        "pick": [
+          "id",
+          "type",
+          "guild_id",
+          "name",
+          "topic",
+          "nsfw",
+          "position",
+          "parent_id",
+          "rate_limit_per_user"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Discord channel ID (snowflake)"
+          }
+        },
+        "required": [
+          "channel_id"
+        ]
+      }
+    },
+    {
+      "name": "list_messages",
+      "description": "Retrieve recent messages from a Discord channel. Returns up to 100 messages ordered newest first.",
+      "method": "GET",
+      "path": "/channels/:channel_id/messages",
+      "queryMap": {
+        "limit": "limit",
+        "before": "before",
+        "after": "after",
+        "around": "around"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "author.username",
+          "author.id",
+          "content",
+          "timestamp",
+          "edited_timestamp",
+          "attachments",
+          "embeds"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Discord channel ID (snowflake)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Number of messages to return (1-100, default 50)"
+          },
+          "before": {
+            "type": "string",
+            "description": "Return messages before this message ID (for pagination)"
+          },
+          "after": {
+            "type": "string",
+            "description": "Return messages after this message ID"
+          },
+          "around": {
+            "type": "string",
+            "description": "Return messages around this message ID"
+          }
+        },
+        "required": [
+          "channel_id"
+        ]
+      }
+    },
+    {
+      "name": "get_guild",
+      "description": "Retrieve details of a Discord guild (server) including name, member count, icon, and feature flags.",
+      "method": "GET",
+      "path": "/guilds/:guild_id",
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "icon",
+          "description",
+          "owner_id",
+          "approximate_member_count",
+          "features",
+          "premium_tier",
+          "preferred_locale"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "Discord guild (server) ID (snowflake)"
+          }
+        },
+        "required": [
+          "guild_id"
+        ]
+      }
+    },
+    {
+      "name": "list_members",
+      "description": "List members of a Discord guild with their roles and join dates. Requires server members intent.",
+      "method": "GET",
+      "path": "/guilds/:guild_id/members",
+      "queryMap": {
+        "limit": "limit",
+        "after": "after"
+      },
+      "response": {
+        "pick": [
+          "user.id",
+          "user.username",
+          "user.discriminator",
+          "nick",
+          "roles",
+          "joined_at",
+          "premium_since"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "Discord guild (server) ID (snowflake)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max members to return (1-1000, default 1)"
+          },
+          "after": {
+            "type": "string",
+            "description": "Member user ID to paginate after"
+          }
+        },
+        "required": [
+          "guild_id"
+        ]
+      }
+    },
+    {
+      "name": "list_channels",
+      "description": "List all channels in a Discord guild including text channels, voice channels, and categories.",
+      "method": "GET",
+      "path": "/guilds/:guild_id/channels",
+      "response": {
+        "pick": [
+          "id",
+          "type",
+          "name",
+          "position",
+          "topic",
+          "parent_id",
+          "nsfw"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "Discord guild (server) ID (snowflake)"
+          }
+        },
+        "required": [
+          "guild_id"
+        ]
+      }
+    },
+    {
+      "name": "get_current_user",
+      "description": "Retrieve the bot user account details — use to confirm the bot identity and get its user ID.",
+      "method": "GET",
+      "path": "/users/@me",
+      "response": {
+        "pick": [
+          "id",
+          "username",
+          "discriminator",
+          "avatar",
+          "bot",
+          "flags"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ]
+}

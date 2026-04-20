@@ -1,0 +1,246 @@
+{
+  "name": "spglobal",
+  "usage": {
+    "envVars": [
+      "SPGLOBAL_API_KEY"
+    ],
+    "setup": "Obtain an API key through the S&P Global Market Intelligence API program. Contact S&P Global for enterprise access."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.spglobal.com/ratings/v1",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "SPGLOBAL_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "search_entities",
+      "description": "Search S&P Global Ratings for rated entities (companies, sovereigns, structured finance vehicles).",
+      "method": "GET",
+      "path": "/entities/search",
+      "queryMap": {
+        "q": "q",
+        "entityType": "entityType",
+        "country": "country",
+        "sector": "sector",
+        "limit": "pageSize",
+        "offset": "pageIndex"
+      },
+      "response": {
+        "pick": [
+          "entities",
+          "totalCount"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Entity name or identifier to search for"
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "corporate",
+              "financial",
+              "sovereign",
+              "structured",
+              "municipal"
+            ],
+            "description": "Filter by entity type"
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 country code filter (e.g., 'US', 'GB')"
+          },
+          "sector": {
+            "type": "string",
+            "description": "Industry sector filter (e.g., 'Technology', 'Energy')"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results to return (default 20)"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Pagination offset"
+          }
+        },
+        "required": [
+          "q"
+        ]
+      }
+    },
+    {
+      "name": "get_rating",
+      "description": "Get current S&P Global credit rating for a specific entity.",
+      "method": "GET",
+      "path": "/entities/:entity_id/ratings/current",
+      "response": {
+        "pick": [
+          "entityId",
+          "entityName",
+          "longTermRating",
+          "shortTermRating",
+          "outlook",
+          "ratingAction",
+          "ratingDate",
+          "ratingType"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "description": "S&P Global entity ID"
+          }
+        },
+        "required": [
+          "entity_id"
+        ]
+      }
+    },
+    {
+      "name": "get_rating_history",
+      "description": "Get historical credit rating actions for an entity.",
+      "method": "GET",
+      "path": "/entities/:entity_id/ratings/history",
+      "queryMap": {
+        "from": "fromDate",
+        "to": "toDate",
+        "limit": "pageSize"
+      },
+      "response": {
+        "pick": [
+          "ratingHistory",
+          "totalCount"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "description": "S&P Global entity ID"
+          },
+          "from": {
+            "type": "string",
+            "description": "Start date (YYYY-MM-DD)"
+          },
+          "to": {
+            "type": "string",
+            "description": "End date (YYYY-MM-DD)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max history records to return"
+          }
+        },
+        "required": [
+          "entity_id"
+        ]
+      }
+    },
+    {
+      "name": "get_outlook_actions",
+      "description": "List recent S&P Global rating actions (upgrades, downgrades, outlook changes) across entities.",
+      "method": "GET",
+      "path": "/ratings/actions",
+      "queryMap": {
+        "actionType": "actionType",
+        "from": "fromDate",
+        "to": "toDate",
+        "sector": "sector",
+        "country": "country",
+        "limit": "pageSize"
+      },
+      "response": {
+        "pick": [
+          "actions",
+          "totalCount"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actionType": {
+            "type": "string",
+            "enum": [
+              "upgrade",
+              "downgrade",
+              "outlook_positive",
+              "outlook_negative",
+              "outlook_stable",
+              "watch_positive",
+              "watch_negative"
+            ],
+            "description": "Filter by action type"
+          },
+          "from": {
+            "type": "string",
+            "description": "Start date (YYYY-MM-DD)"
+          },
+          "to": {
+            "type": "string",
+            "description": "End date (YYYY-MM-DD)"
+          },
+          "sector": {
+            "type": "string",
+            "description": "Sector filter"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country filter (ISO alpha-2)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max actions to return"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_issuer_report",
+      "description": "Get a structured issuer credit report summary for a rated entity.",
+      "method": "GET",
+      "path": "/entities/:entity_id/report",
+      "response": {
+        "pick": [
+          "entityId",
+          "entityName",
+          "rationale",
+          "outlook",
+          "keyRatingFactors",
+          "financialSummary",
+          "lastReviewDate"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "description": "S&P Global entity ID"
+          }
+        },
+        "required": [
+          "entity_id"
+        ]
+      }
+    }
+  ]
+}

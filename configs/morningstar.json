@@ -1,0 +1,215 @@
+{
+  "name": "morningstar",
+  "usage": {
+    "envVars": [
+      "MORNINGSTAR_API_KEY"
+    ],
+    "setup": "Obtain an API key through the Morningstar Data API program. Contact Morningstar for access at https://developer.morningstar.com."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.morningstar.com/v2",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "MORNINGSTAR_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "search_securities",
+      "description": "Search for securities (stocks, funds, ETFs) in the Morningstar database.",
+      "method": "GET",
+      "path": "/securities/search",
+      "queryMap": {
+        "q": "q",
+        "securityType": "securityType",
+        "currency": "currency",
+        "limit": "pageSize"
+      },
+      "response": {
+        "pick": [
+          "results"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Search query — ticker symbol, name, or ISIN (e.g., 'AAPL', 'Vanguard S&P 500')"
+          },
+          "securityType": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "fund",
+              "etf",
+              "index"
+            ],
+            "description": "Filter by security type"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Filter by currency code (e.g., 'USD', 'EUR')"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results to return (default 20)"
+          }
+        },
+        "required": [
+          "q"
+        ]
+      }
+    },
+    {
+      "name": "get_security_overview",
+      "description": "Get overview data for a security including rating, performance, and key stats.",
+      "method": "GET",
+      "path": "/securities/:secId/overview",
+      "response": {
+        "pick": [
+          "secId",
+          "name",
+          "ticker",
+          "starRating",
+          "analystRating",
+          "fairValue",
+          "moat",
+          "stewardship",
+          "uncertainty",
+          "sectorName",
+          "industryName"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "secId": {
+            "type": "string",
+            "description": "Morningstar security ID (e.g., '0P0000006A')"
+          }
+        },
+        "required": [
+          "secId"
+        ]
+      }
+    },
+    {
+      "name": "get_star_rating",
+      "description": "Get Morningstar star rating and analyst fair value estimate for a security.",
+      "method": "GET",
+      "path": "/securities/:secId/rating",
+      "response": {
+        "pick": [
+          "secId",
+          "starRating",
+          "analystRating",
+          "fairValue",
+          "priceVsFairValue",
+          "uncertainty",
+          "lastUpdated"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "secId": {
+            "type": "string",
+            "description": "Morningstar security ID"
+          }
+        },
+        "required": [
+          "secId"
+        ]
+      }
+    },
+    {
+      "name": "get_performance",
+      "description": "Get historical performance data for a security over various time periods.",
+      "method": "GET",
+      "path": "/securities/:secId/performance",
+      "queryMap": {
+        "frequency": "frequency"
+      },
+      "response": {
+        "pick": [
+          "trailing",
+          "annual",
+          "quarterly"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "secId": {
+            "type": "string",
+            "description": "Morningstar security ID"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "monthly",
+              "annual"
+            ],
+            "description": "Return frequency (default 'monthly')"
+          }
+        },
+        "required": [
+          "secId"
+        ]
+      }
+    },
+    {
+      "name": "get_financials",
+      "description": "Get financial statements (income, balance sheet, cash flow) for a stock.",
+      "method": "GET",
+      "path": "/securities/:secId/financials",
+      "queryMap": {
+        "reportType": "reportType",
+        "frequency": "frequency"
+      },
+      "response": {
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "secId": {
+            "type": "string",
+            "description": "Morningstar security ID"
+          },
+          "reportType": {
+            "type": "string",
+            "enum": [
+              "income-statement",
+              "balance-sheet",
+              "cash-flow"
+            ],
+            "description": "Financial statement type"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "annual",
+              "quarterly"
+            ],
+            "description": "Reporting frequency (default 'annual')"
+          }
+        },
+        "required": [
+          "secId",
+          "reportType"
+        ]
+      }
+    }
+  ]
+}

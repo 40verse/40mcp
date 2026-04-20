@@ -1,0 +1,372 @@
+{
+  "_comment": "PagerDuty API config. Required env vars: PAGERDUTY_API_KEY (REST API key from User Profile > User Settings > API Access, or from Admin > API Access). Required scopes: Read access for list/get tools; Write access for trigger/resolve/acknowledge. Docs: https://developer.pagerduty.com/api-reference/",
+  "name": "pagerduty",
+  "usage": {
+    "envVars": [
+      "PAGERDUTY_API_KEY"
+    ],
+    "setup": "Create a PagerDuty API key at https://app.pagerduty.com/api_keys. Use a user or service API key with read/write access."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.pagerduty.com",
+  "strictSsrf": true,
+  "auth": {
+    "type": "header",
+    "header": "Authorization",
+    "envVar": "PAGERDUTY_API_KEY",
+    "prefix": "Token token="
+  },
+  "tools": [
+    {
+      "name": "list_incidents",
+      "description": "List PagerDuty incidents with optional filters by status, urgency, service, or assignee. Returns recent incidents sorted by created_at desc.",
+      "method": "GET",
+      "path": "/incidents",
+      "queryMap": {
+        "statuses": "statuses[]",
+        "urgencies": "urgencies[]",
+        "service_ids": "service_ids[]",
+        "team_ids": "team_ids[]",
+        "user_ids": "user_ids[]",
+        "since": "since",
+        "until": "until",
+        "sort_by": "sort_by",
+        "limit": "limit",
+        "offset": "offset"
+      },
+      "headers": {
+        "Accept": "application/vnd.pagerduty+json;version=2"
+      },
+      "response": {
+        "pick": [
+          "incidents"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "triggered",
+                "acknowledged",
+                "resolved"
+              ]
+            },
+            "description": "Filter by incident status (default: triggered and acknowledged)"
+          },
+          "urgencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "high",
+                "low"
+              ]
+            },
+            "description": "Filter by urgency level"
+          },
+          "service_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by service IDs"
+          },
+          "team_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by team IDs"
+          },
+          "since": {
+            "type": "string",
+            "description": "Start of date range in ISO 8601 format (e.g. '2024-01-01T00:00:00Z')"
+          },
+          "until": {
+            "type": "string",
+            "description": "End of date range in ISO 8601 format"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "created_at:asc",
+              "created_at:desc",
+              "resolved_at:asc",
+              "resolved_at:desc"
+            ],
+            "description": "Sort field and direction (default 'created_at:desc')"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max incidents to return (1-100, default 25)"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Offset for pagination"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_incident",
+      "description": "Retrieve full details of a specific PagerDuty incident including timeline, alerts, and acknowledgments.",
+      "method": "GET",
+      "path": "/incidents/:incident_id",
+      "headers": {
+        "Accept": "application/vnd.pagerduty+json;version=2"
+      },
+      "response": {
+        "pick": [
+          "incident"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "incident_id": {
+            "type": "string",
+            "description": "PagerDuty incident ID (e.g. 'P1234AB')"
+          }
+        },
+        "required": [
+          "incident_id"
+        ]
+      }
+    },
+    {
+      "name": "list_services",
+      "description": "List PagerDuty services (integrations configured to receive alerts) with escalation policy and status info.",
+      "method": "GET",
+      "path": "/services",
+      "queryMap": {
+        "team_ids": "team_ids[]",
+        "query": "query",
+        "limit": "limit",
+        "offset": "offset",
+        "sort_by": "sort_by"
+      },
+      "headers": {
+        "Accept": "application/vnd.pagerduty+json;version=2"
+      },
+      "response": {
+        "pick": [
+          "services"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter services by team IDs"
+          },
+          "query": {
+            "type": "string",
+            "description": "Filter services by name"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max services to return (1-100)"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Offset for pagination"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "name:asc",
+              "name:desc"
+            ],
+            "description": "Sort field and direction"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_service",
+      "description": "Retrieve full details of a specific PagerDuty service including its integration keys, escalation policy, and incident urgency rules.",
+      "method": "GET",
+      "path": "/services/:service_id",
+      "headers": {
+        "Accept": "application/vnd.pagerduty+json;version=2"
+      },
+      "response": {
+        "pick": [
+          "service"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service_id": {
+            "type": "string",
+            "description": "PagerDuty service ID (e.g. 'P1X2Y3Z')"
+          }
+        },
+        "required": [
+          "service_id"
+        ]
+      }
+    },
+    {
+      "name": "trigger_incident",
+      "description": "Trigger a new PagerDuty incident on a specified service. Creates an alert and notifies the on-call responder.",
+      "method": "POST",
+      "path": "/incidents",
+      "policy": "require_approval",
+      "headers": {
+        "Accept": "application/vnd.pagerduty+json;version=2",
+        "From": "${PAGERDUTY_FROM_EMAIL}"
+      },
+      "response": {
+        "pick": [
+          "incident"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Incident title / summary (concise description of the issue)"
+          },
+          "service_id": {
+            "type": "string",
+            "description": "ID of the PagerDuty service to trigger the incident on"
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "high",
+              "low"
+            ],
+            "description": "Incident urgency (default 'high')"
+          },
+          "body": {
+            "type": "string",
+            "description": "Detailed incident body / description (markdown supported)"
+          },
+          "escalation_policy_id": {
+            "type": "string",
+            "description": "Override the service's default escalation policy"
+          },
+          "incident_key": {
+            "type": "string",
+            "description": "Deduplication key — same key will update an existing incident instead of creating a new one"
+          }
+        },
+        "required": [
+          "title",
+          "service_id"
+        ]
+      }
+    },
+    {
+      "name": "manage_incident",
+      "description": "Acknowledge or resolve a PagerDuty incident. Use action='acknowledge' to claim ownership, or action='resolve' to close the incident.",
+      "method": "PUT",
+      "path": "/incidents/:incident_id",
+      "headers": {
+        "Accept": "application/vnd.pagerduty+json;version=2",
+        "From": "${PAGERDUTY_FROM_EMAIL}"
+      },
+      "response": {
+        "pick": [
+          "incident"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "incident_id": {
+            "type": "string",
+            "description": "PagerDuty incident ID"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "acknowledge",
+              "resolve"
+            ],
+            "description": "Action to perform on the incident"
+          },
+          "resolution": {
+            "type": "string",
+            "description": "Optional resolution note (shown when resolving an incident)"
+          }
+        },
+        "required": [
+          "incident_id",
+          "action"
+        ]
+      }
+    },
+    {
+      "name": "list_on_calls",
+      "description": "List current on-call users across escalation policies and schedules. Shows who is on-call right now.",
+      "method": "GET",
+      "path": "/oncalls",
+      "queryMap": {
+        "escalation_policy_ids": "escalation_policy_ids[]",
+        "schedule_ids": "schedule_ids[]",
+        "user_ids": "user_ids[]",
+        "since": "since",
+        "until": "until"
+      },
+      "headers": {
+        "Accept": "application/vnd.pagerduty+json;version=2"
+      },
+      "response": {
+        "pick": [
+          "oncalls"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "escalation_policy_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by escalation policy IDs"
+          },
+          "schedule_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by schedule IDs"
+          },
+          "since": {
+            "type": "string",
+            "description": "Start time for on-call window (ISO 8601, default now)"
+          },
+          "until": {
+            "type": "string",
+            "description": "End time for on-call window (ISO 8601)"
+          }
+        }
+      }
+    }
+  ]
+}

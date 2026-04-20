@@ -1,0 +1,37 @@
+node_modules/
+dist/
+*.tgz
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.vault
+.npm-cache/
+.ga-status.json
+
+# Local agent wiring (never publish)
+.mcp.json
+
+# Generated stress-test and demo artifacts
+scripts/stress-test/results/
+examples/*/results/
+examples/results/
+
+# Local test-output scratch (never committed)
+test-output*.log
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local agent + editor state (never publish)
+.claude/
+.vscode/
+
+# Runtime test artifacts and session state (root-level)
+.memory/

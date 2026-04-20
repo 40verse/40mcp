@@ -1,0 +1,530 @@
+{
+  "name": "notion",
+  "usage": {
+    "envVars": [
+      "NOTION_API_KEY"
+    ],
+    "setup": "Create an internal integration at https://www.notion.so/my-integrations. Share the specific Notion pages/databases with the integration to grant access."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.notion.com/v1",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "NOTION_API_KEY"
+  },
+  "hooks": {
+    "beforeRequest": null
+  },
+  "tools": [
+    {
+      "name": "search",
+      "description": "Search across all Notion pages and databases.",
+      "method": "POST",
+      "path": "/search",
+      "bodyMap": {
+        "search_query": "query",
+        "sort_direction": "sort.direction",
+        "sort_timestamp": "sort.timestamp",
+        "filter_value": "filter.value",
+        "filter_property": "filter.property"
+      },
+      "response": {
+        "pick": [
+          "results",
+          "has_more"
+        ],
+        "limit": 20,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search_query": {
+            "type": "string",
+            "description": "Search text"
+          },
+          "sort_direction": {
+            "type": "string",
+            "enum": [
+              "ascending",
+              "descending"
+            ],
+            "description": "Sort direction"
+          },
+          "sort_timestamp": {
+            "type": "string",
+            "enum": [
+              "last_edited_time"
+            ],
+            "description": "Sort by timestamp"
+          },
+          "filter_value": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ],
+            "description": "Filter to pages or databases only"
+          },
+          "filter_property": {
+            "type": "string",
+            "enum": [
+              "object"
+            ],
+            "description": "Filter property (always 'object')"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_page",
+      "description": "Retrieve a Notion page by ID.",
+      "method": "GET",
+      "path": "/pages/:page_id",
+      "response": {
+        "pick": [
+          "id",
+          "url",
+          "created_time",
+          "last_edited_time",
+          "properties"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "description": "Page UUID (with or without hyphens)"
+          }
+        },
+        "required": [
+          "page_id"
+        ]
+      }
+    },
+    {
+      "name": "get_page_content",
+      "description": "Get the block children (content) of a Notion page.",
+      "method": "GET",
+      "path": "/blocks/:block_id/children",
+      "queryMap": {
+        "page_size": "page_size"
+      },
+      "response": {
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "description": "Page/block UUID"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Max blocks to return (default 100)"
+          }
+        },
+        "required": [
+          "block_id"
+        ]
+      }
+    },
+    {
+      "name": "create_page",
+      "description": "Create a new Notion page in a database or as child of another page.",
+      "method": "POST",
+      "path": "/pages",
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parent_database_id": {
+            "type": "string",
+            "description": "Parent database UUID"
+          },
+          "parent_page_id": {
+            "type": "string",
+            "description": "Parent page UUID (alternative to database)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Page title"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Page properties (schema depends on database)"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      }
+    },
+    {
+      "name": "update_page",
+      "description": "Update properties on a Notion page.",
+      "method": "PATCH",
+      "path": "/pages/:page_id",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "description": "Page UUID"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Properties to update"
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Set true to archive"
+          }
+        },
+        "required": [
+          "page_id"
+        ]
+      }
+    },
+    {
+      "name": "query_database",
+      "description": "Query a Notion database with filters and sorts.",
+      "method": "POST",
+      "path": "/databases/:database_id/query",
+      "response": {
+        "pick": [
+          "results",
+          "has_more"
+        ],
+        "limit": 25,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "database_id": {
+            "type": "string",
+            "description": "Database UUID"
+          },
+          "filter": {
+            "type": "object",
+            "description": "Notion filter object"
+          },
+          "sorts": {
+            "type": "array",
+            "description": "Sort specifications"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          }
+        },
+        "required": [
+          "database_id"
+        ]
+      }
+    },
+    {
+      "name": "get_database",
+      "description": "Retrieve a Notion database schema.",
+      "method": "GET",
+      "path": "/databases/:database_id",
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "description",
+          "properties",
+          "url"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "database_id": {
+            "type": "string",
+            "description": "Database UUID"
+          }
+        },
+        "required": [
+          "database_id"
+        ]
+      }
+    },
+    {
+      "name": "append_blocks",
+      "description": "Append content blocks to a Notion page.",
+      "method": "PATCH",
+      "path": "/blocks/:block_id/children",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "description": "Page/block UUID to append to"
+          },
+          "children": {
+            "type": "array",
+            "description": "Array of block objects to append"
+          }
+        },
+        "required": [
+          "block_id",
+          "children"
+        ]
+      }
+    },
+    {
+      "name": "list_databases",
+      "description": "List all Notion databases the integration has access to.",
+      "method": "POST",
+      "path": "/search",
+      "bodyMap": {
+        "filter_value": "filter.value",
+        "filter_property": "filter.property",
+        "page_size": "page_size",
+        "start_cursor": "start_cursor"
+      },
+      "response": {
+        "pick": [
+          "results",
+          "has_more",
+          "next_cursor"
+        ],
+        "limit": 25,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter_value": {
+            "type": "string",
+            "enum": [
+              "database"
+            ],
+            "description": "Always 'database' to filter to databases only"
+          },
+          "filter_property": {
+            "type": "string",
+            "enum": [
+              "object"
+            ],
+            "description": "Always 'object'"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Max results per page (1-100)"
+          },
+          "start_cursor": {
+            "type": "string",
+            "description": "Pagination cursor from previous response"
+          }
+        }
+      }
+    },
+    {
+      "name": "update_database",
+      "description": "Update a Notion database title, description, or properties schema.",
+      "method": "PATCH",
+      "path": "/databases/:database_id",
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "description",
+          "properties",
+          "url"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "database_id": {
+            "type": "string",
+            "description": "Database UUID"
+          },
+          "title": {
+            "type": "array",
+            "description": "New title as rich text array"
+          },
+          "description": {
+            "type": "array",
+            "description": "New description as rich text array"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Property schema changes — add, rename, or reconfigure properties"
+          }
+        },
+        "required": [
+          "database_id"
+        ]
+      }
+    },
+    {
+      "name": "delete_block",
+      "description": "Delete (archive) a Notion block by ID. This is permanent — the block will no longer appear in the page.",
+      "method": "DELETE",
+      "path": "/blocks/:block_id",
+      "response": {
+        "pick": [
+          "id",
+          "archived",
+          "type"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "description": "Block UUID to delete"
+          }
+        },
+        "required": [
+          "block_id"
+        ]
+      }
+    },
+    {
+      "name": "get_block_children",
+      "description": "Retrieve the children blocks of a specific block (not a full page — use get_page_content for pages).",
+      "method": "GET",
+      "path": "/blocks/:block_id/children",
+      "queryMap": {
+        "page_size": "page_size",
+        "start_cursor": "start_cursor"
+      },
+      "response": {
+        "pick": [
+          "results",
+          "has_more",
+          "next_cursor"
+        ],
+        "limit": 50,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "description": "Block UUID whose children to retrieve"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Max children per page (1-100)"
+          },
+          "start_cursor": {
+            "type": "string",
+            "description": "Pagination cursor"
+          }
+        },
+        "required": [
+          "block_id"
+        ]
+      }
+    },
+    {
+      "name": "get_user",
+      "description": "Retrieve a Notion user by their user ID.",
+      "method": "GET",
+      "path": "/users/:user_id",
+      "response": {
+        "pick": [
+          "id",
+          "type",
+          "name",
+          "avatar_url",
+          "person.email",
+          "bot.owner"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "User UUID"
+          }
+        },
+        "required": [
+          "user_id"
+        ]
+      }
+    },
+    {
+      "name": "list_users",
+      "description": "List all users in the Notion workspace that the integration can see.",
+      "method": "GET",
+      "path": "/users",
+      "queryMap": {
+        "page_size": "page_size",
+        "start_cursor": "start_cursor"
+      },
+      "response": {
+        "pick": [
+          "results",
+          "has_more",
+          "next_cursor"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_size": {
+            "type": "integer",
+            "description": "Max users per page (1-100)"
+          },
+          "start_cursor": {
+            "type": "string",
+            "description": "Pagination cursor from previous response"
+          }
+        }
+      }
+    },
+    {
+      "name": "archive_page",
+      "description": "Archive a Notion page (soft-delete). The page is hidden from the workspace but can be restored. To unarchive, set archived to false.",
+      "method": "PATCH",
+      "path": "/pages/:page_id",
+      "bodyMap": {
+        "archived": "archived"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "archived",
+          "url",
+          "last_edited_time"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "description": "Page UUID to archive"
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Set true to archive, false to restore"
+          }
+        },
+        "required": [
+          "page_id",
+          "archived"
+        ]
+      }
+    }
+  ]
+}

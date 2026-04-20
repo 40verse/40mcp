@@ -1,0 +1,19 @@
+# package.json "files" is the source of truth for what ships to npm.
+# This .npmignore is a defense-in-depth belt against accidental publishes
+# of files that would match "files" but must never leave the repo.
+
+# Vault artifacts (NEVER publish)
+*.vault.json
+.40mcp-vault*
+.vault
+.vault.*
+
+# Dotfile leakage
+.env
+.env.*
+
+# Keys / certs
+*.pem
+*.key
+*.p12
+*.pfx

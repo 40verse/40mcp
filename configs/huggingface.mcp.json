@@ -1,0 +1,8 @@
+{
+  "_comment": "Link to HuggingFace MCP server. Use with: 40mcp link configs/huggingface.mcp.json",
+  "mcpServers": {
+    "hf": {
+      "url": "https://huggingface.co/mcp"
+    }
+  }
+}

@@ -1,0 +1,276 @@
+{
+  "name": "jira",
+  "usage": {
+    "envVars": [
+      "JIRA_AUTH",
+      "JIRA_BASE_URL"
+    ],
+    "envVarDescriptions": {
+      "JIRA_BASE_URL": "Your Jira Cloud site URL, no trailing slash (e.g. 'https://acme.atlassian.net') — substituted into baseUrl."
+    },
+    "setup": "Set JIRA_AUTH to base64-encoded \"email:api_token\". Create an Atlassian API token at https://id.atlassian.com/manage-profile/security/api-tokens, then run: echo -n \"you@example.com:TOKEN\" | base64. Set JIRA_BASE_URL to your Jira site URL (e.g. https://acme.atlassian.net)."
+  },
+  "version": "1.0.0",
+  "baseUrl": "${JIRA_BASE_URL}/rest/api/3",
+  "strictSsrf": true,
+  "auth": {
+    "type": "basic",
+    "envVar": "JIRA_AUTH"
+  },
+  "tools": [
+    {
+      "name": "search_issues",
+      "description": "Search Jira issues using JQL (Jira Query Language).",
+      "method": "GET",
+      "path": "/search",
+      "queryMap": {
+        "jql_query": "jql",
+        "max_results": "maxResults",
+        "start_at": "startAt",
+        "fields_list": "fields"
+      },
+      "response": {
+        "pick": [
+          "total",
+          "issues"
+        ],
+        "limit": 25,
+        "summary": "Showing {shown} of {total} issues",
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jql_query": {
+            "type": "string",
+            "description": "JQL query (e.g., 'project = PROJ AND status = Open')"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          },
+          "start_at": {
+            "type": "integer",
+            "description": "Pagination offset"
+          },
+          "fields_list": {
+            "type": "string",
+            "description": "Comma-separated field names to return"
+          }
+        },
+        "required": [
+          "jql_query"
+        ]
+      }
+    },
+    {
+      "name": "get_issue",
+      "description": "Get a Jira issue by key (e.g., PROJ-123).",
+      "method": "GET",
+      "path": "/issue/:issue_key",
+      "response": {
+        "pick": [
+          "key",
+          "fields.summary",
+          "fields.status",
+          "fields.assignee",
+          "fields.priority",
+          "fields.labels",
+          "fields.created",
+          "fields.updated",
+          "fields.description"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_key": {
+            "type": "string",
+            "description": "Issue key (e.g., PROJ-123)"
+          }
+        },
+        "required": [
+          "issue_key"
+        ]
+      }
+    },
+    {
+      "name": "create_issue",
+      "description": "Create a new Jira issue.",
+      "method": "POST",
+      "path": "/issue",
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "description": "Project key (e.g., PROJ)"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Issue title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Issue description (markdown)"
+          },
+          "issue_type": {
+            "type": "string",
+            "description": "Issue type (Task, Bug, Story, Epic)"
+          },
+          "priority": {
+            "type": "string",
+            "description": "Priority (Highest, High, Medium, Low, Lowest)"
+          },
+          "assignee_id": {
+            "type": "string",
+            "description": "Assignee account ID"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Labels"
+          }
+        },
+        "required": [
+          "project_key",
+          "summary",
+          "issue_type"
+        ]
+      }
+    },
+    {
+      "name": "update_issue",
+      "description": "Update fields on an existing Jira issue.",
+      "method": "PUT",
+      "path": "/issue/:issue_key",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_key": {
+            "type": "string",
+            "description": "Issue key (e.g., PROJ-123)"
+          },
+          "summary": {
+            "type": "string",
+            "description": "New title"
+          },
+          "description": {
+            "type": "string",
+            "description": "New description"
+          },
+          "assignee_id": {
+            "type": "string",
+            "description": "New assignee account ID"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "issue_key"
+        ]
+      }
+    },
+    {
+      "name": "add_comment",
+      "description": "Add a comment to a Jira issue.",
+      "method": "POST",
+      "path": "/issue/:issue_key/comment",
+      "bodyMap": {
+        "comment_body": "body"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_key": {
+            "type": "string",
+            "description": "Issue key (e.g., PROJ-123)"
+          },
+          "comment_body": {
+            "type": "string",
+            "description": "Comment text"
+          }
+        },
+        "required": [
+          "issue_key",
+          "comment_body"
+        ]
+      }
+    },
+    {
+      "name": "transition_issue",
+      "description": "Transition a Jira issue to a new status (e.g., In Progress, Done).",
+      "method": "POST",
+      "path": "/issue/:issue_key/transitions",
+      "bodyMap": {
+        "transition_id": "transition.id"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_key": {
+            "type": "string",
+            "description": "Issue key (e.g., PROJ-123)"
+          },
+          "transition_id": {
+            "type": "string",
+            "description": "Transition ID (get from get_transitions)"
+          }
+        },
+        "required": [
+          "issue_key",
+          "transition_id"
+        ]
+      }
+    },
+    {
+      "name": "get_transitions",
+      "description": "Get available status transitions for an issue.",
+      "method": "GET",
+      "path": "/issue/:issue_key/transitions",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_key": {
+            "type": "string",
+            "description": "Issue key"
+          }
+        },
+        "required": [
+          "issue_key"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "list_projects",
+      "description": "List all accessible Jira projects.",
+      "method": "GET",
+      "path": "/project",
+      "response": {
+        "pick": [
+          "key",
+          "name",
+          "projectTypeKey",
+          "lead.displayName"
+        ],
+        "limit": 50,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ]
+}

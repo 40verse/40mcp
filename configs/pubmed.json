@@ -1,0 +1,230 @@
+{
+  "name": "pubmed",
+  "usage": {
+    "envVars": [
+      "NCBI_API_KEY"
+    ],
+    "setup": "Obtain a free NCBI API key at https://www.ncbi.nlm.nih.gov/account/ to increase rate limits from 3 to 10 requests/second."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils",
+  "strictSsrf": true,
+  "auth": {
+    "type": "header",
+    "header": "api_key",
+    "envVar": "NCBI_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "search",
+      "description": "Search PubMed biomedical literature database. Returns article IDs matching the query.",
+      "method": "GET",
+      "path": "/esearch.fcgi",
+      "queryMap": {
+        "term": "term",
+        "retmax": "retmax",
+        "retstart": "retstart",
+        "sort": "sort",
+        "datetype": "datetype",
+        "mindate": "mindate",
+        "maxdate": "maxdate",
+        "db": "db"
+      },
+      "response": {
+        "pick": [
+          "esearchresult"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "term": {
+            "type": "string",
+            "description": "PubMed search query (e.g., 'CRISPR cancer treatment [Title/Abstract]', 'Smith J[Author] AND diabetes[MeSH]')"
+          },
+          "retmax": {
+            "type": "integer",
+            "description": "Max article IDs to return (default 20, max 10000)"
+          },
+          "retstart": {
+            "type": "integer",
+            "description": "Offset for pagination"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "pub_date",
+              "Author",
+              "JournalName"
+            ],
+            "description": "Sort order (default 'relevance')"
+          },
+          "datetype": {
+            "type": "string",
+            "enum": [
+              "pdat",
+              "edat",
+              "mdat"
+            ],
+            "description": "Date field: publication (pdat), entry (edat), or modification (mdat)"
+          },
+          "mindate": {
+            "type": "string",
+            "description": "Start date filter (YYYY/MM/DD or YYYY)"
+          },
+          "maxdate": {
+            "type": "string",
+            "description": "End date filter (YYYY/MM/DD or YYYY)"
+          },
+          "db": {
+            "type": "string",
+            "description": "Database to search (default 'pubmed', also: 'pmc', 'gene', 'protein')"
+          }
+        },
+        "required": [
+          "term"
+        ]
+      }
+    },
+    {
+      "name": "fetch_articles",
+      "description": "Fetch full article summaries from PubMed by article IDs (PMIDs). Use after search to get details.",
+      "method": "GET",
+      "path": "/esummary.fcgi",
+      "queryMap": {
+        "id": "id",
+        "db": "db",
+        "retmode": "retmode"
+      },
+      "response": {
+        "tokenBudget": 5000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Comma-separated PubMed IDs (PMIDs) to fetch (e.g., '38123456,38123457')"
+          },
+          "db": {
+            "type": "string",
+            "description": "Database (default 'pubmed')"
+          },
+          "retmode": {
+            "type": "string",
+            "enum": [
+              "json",
+              "xml"
+            ],
+            "description": "Response format (default 'json')"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "fetch_abstract",
+      "description": "Fetch the full abstract text of a PubMed article by PMID.",
+      "method": "GET",
+      "path": "/efetch.fcgi",
+      "queryMap": {
+        "id": "id",
+        "db": "db",
+        "rettype": "rettype",
+        "retmode": "retmode"
+      },
+      "response": {
+        "tokenBudget": 3000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "PubMed ID (PMID) of the article"
+          },
+          "db": {
+            "type": "string",
+            "description": "Database (default 'pubmed')"
+          },
+          "rettype": {
+            "type": "string",
+            "description": "Retrieval type (default 'abstract', also: 'medline', 'uilist')"
+          },
+          "retmode": {
+            "type": "string",
+            "enum": [
+              "text",
+              "xml",
+              "json"
+            ],
+            "description": "Response format (default 'text')"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "find_related_articles",
+      "description": "Find articles related to a given PubMed article using NCBI's eLink.",
+      "method": "GET",
+      "path": "/elink.fcgi",
+      "queryMap": {
+        "id": "id",
+        "db": "db",
+        "dbfrom": "dbfrom",
+        "cmd": "cmd",
+        "retmax": "retmax"
+      },
+      "response": {
+        "pick": [
+          "linksets"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Source article PMID"
+          },
+          "db": {
+            "type": "string",
+            "description": "Target database (default 'pubmed')"
+          },
+          "dbfrom": {
+            "type": "string",
+            "description": "Source database (default 'pubmed')"
+          },
+          "cmd": {
+            "type": "string",
+            "enum": [
+              "neighbor_score",
+              "neighbor",
+              "prlinks"
+            ],
+            "description": "eLink command (default 'neighbor_score' for related articles)"
+          },
+          "retmax": {
+            "type": "integer",
+            "description": "Max related articles to return (default 20)"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    }
+  ]
+}

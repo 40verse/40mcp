@@ -1,0 +1,256 @@
+{
+  "name": "huggingface",
+  "usage": {
+    "envVars": [
+      "HF_TOKEN"
+    ],
+    "setup": "Create a token at https://huggingface.co/settings/tokens. A read token suffices for inference; write token required for uploads."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://huggingface.co/api",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "HF_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "search_models",
+      "description": "Search Hugging Face Hub for AI models by task, library, or keyword.",
+      "method": "GET",
+      "path": "/models",
+      "queryMap": {
+        "search": "search",
+        "filter": "filter",
+        "sort": "sort",
+        "direction": "direction",
+        "limit": "limit",
+        "task": "pipeline_tag",
+        "library": "library",
+        "language": "language"
+      },
+      "response": {
+        "pick": [
+          "modelId",
+          "pipeline_tag",
+          "downloads",
+          "likes",
+          "lastModified",
+          "tags",
+          "library_name"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Text to search in model names and descriptions"
+          },
+          "task": {
+            "type": "string",
+            "description": "Filter by ML task (e.g., 'text-generation', 'image-classification', 'text-to-speech')"
+          },
+          "library": {
+            "type": "string",
+            "description": "Filter by library (e.g., 'transformers', 'diffusers', 'pytorch')"
+          },
+          "language": {
+            "type": "string",
+            "description": "Filter by language code (e.g., 'en', 'fr')"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "downloads",
+              "likes",
+              "lastModified",
+              "trending"
+            ],
+            "description": "Sort field (default: downloads)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max models to return (default 20, max 100)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_model",
+      "description": "Get detailed information about a specific Hugging Face model.",
+      "method": "GET",
+      "path": "/models/:model_id",
+      "response": {
+        "pick": [
+          "modelId",
+          "pipeline_tag",
+          "downloads",
+          "likes",
+          "tags",
+          "library_name",
+          "card_data",
+          "siblings",
+          "lastModified",
+          "safetensors"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "description": "Model ID in format 'owner/model-name' (e.g., 'mistralai/Mistral-7B-v0.1')"
+          }
+        },
+        "required": [
+          "model_id"
+        ]
+      }
+    },
+    {
+      "name": "run_inference",
+      "description": "Run inference on a Hugging Face Inference API model.",
+      "method": "POST",
+      "path": "https://api-inference.huggingface.co/models/:model_id",
+      "bodyMap": {
+        "inputs": "inputs",
+        "parameters": "parameters",
+        "options": "options"
+      },
+      "response": {
+        "tokenBudget": 2000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "description": "Model ID to run inference on (e.g., 'gpt2', 'facebook/bart-large-cnn')"
+          },
+          "inputs": {
+            "type": "string",
+            "description": "Input text or data for the model"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Model-specific parameters (e.g., {max_new_tokens: 200, temperature: 0.7})"
+          },
+          "options": {
+            "type": "object",
+            "description": "Inference options (e.g., {wait_for_model: true})"
+          }
+        },
+        "required": [
+          "model_id",
+          "inputs"
+        ]
+      }
+    },
+    {
+      "name": "search_datasets",
+      "description": "Search Hugging Face Hub for datasets.",
+      "method": "GET",
+      "path": "/datasets",
+      "queryMap": {
+        "search": "search",
+        "task": "task_categories",
+        "language": "language",
+        "limit": "limit",
+        "sort": "sort"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "downloads",
+          "likes",
+          "lastModified",
+          "tags",
+          "task_categories"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Search text for dataset names and descriptions"
+          },
+          "task": {
+            "type": "string",
+            "description": "Filter by task category (e.g., 'text-classification', 'question-answering')"
+          },
+          "language": {
+            "type": "string",
+            "description": "Filter by language code"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max datasets to return"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "downloads",
+              "likes",
+              "lastModified"
+            ],
+            "description": "Sort order"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_spaces",
+      "description": "Search Hugging Face Spaces (interactive ML demos).",
+      "method": "GET",
+      "path": "/spaces",
+      "queryMap": {
+        "search": "search",
+        "limit": "limit",
+        "sort": "sort"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "likes",
+          "sdk",
+          "tags",
+          "lastModified"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Search text for Space names"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max spaces to return"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "likes",
+              "lastModified",
+              "trending"
+            ],
+            "description": "Sort order"
+          }
+        }
+      }
+    }
+  ]
+}

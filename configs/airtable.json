@@ -1,0 +1,659 @@
+{
+  "name": "airtable",
+  "usage": {
+    "envVars": [
+      "AIRTABLE_API_KEY"
+    ],
+    "scopes": [
+      "data.records:read",
+      "data.records:write",
+      "schema.bases:read",
+      "schema.bases:write",
+      "webhook.manage"
+    ],
+    "setup": "Create a personal access token at https://airtable.com/create/tokens with required scopes."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.airtable.com/v0",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "AIRTABLE_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "list_records",
+      "description": "List records from an Airtable table with optional filtering, sorting, and field selection. Use filter (filterByFormula) for row-level conditions.",
+      "method": "GET",
+      "path": "/:base_id/:table_id",
+      "queryMap": {
+        "max_records": "maxRecords",
+        "view_name": "view",
+        "filter": "filterByFormula",
+        "sort_field": "sort[0][field]",
+        "sort_direction": "sort[0][direction]",
+        "page_size": "pageSize",
+        "offset": "offset"
+      },
+      "response": {
+        "pick": [
+          "records",
+          "offset"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table name or table ID (starts with tbl)"
+          },
+          "max_records": {
+            "type": "integer",
+            "description": "Maximum total records to return"
+          },
+          "view_name": {
+            "type": "string",
+            "description": "Name of a saved view to apply its filter and sort"
+          },
+          "filter": {
+            "type": "string",
+            "description": "Airtable formula to filter rows e.g. {Status}=\"Active\" or AND({Priority}=\"High\",{Done}=FALSE())"
+          },
+          "sort_field": {
+            "type": "string",
+            "description": "Field name to sort by"
+          },
+          "sort_direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Records per page (max 100)"
+          },
+          "offset": {
+            "type": "string",
+            "description": "Pagination offset token from previous response"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id"
+        ]
+      }
+    },
+    {
+      "name": "get_record",
+      "description": "Retrieve a single Airtable record by its record ID, returning all field values.",
+      "method": "GET",
+      "path": "/:base_id/:table_id/:record_id",
+      "response": {
+        "pick": [
+          "id",
+          "fields",
+          "createdTime"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table name or table ID (starts with tbl)"
+          },
+          "record_id": {
+            "type": "string",
+            "description": "Record ID (starts with rec)"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id",
+          "record_id"
+        ]
+      }
+    },
+    {
+      "name": "create_record",
+      "description": "Create a new record in an Airtable table. Pass field names and values as a fields object matching the table schema.",
+      "method": "POST",
+      "path": "/:base_id/:table_id",
+      "bodyMap": {
+        "fields": "fields"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "fields",
+          "createdTime"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table name or table ID (starts with tbl)"
+          },
+          "fields": {
+            "type": "object",
+            "description": "Key-value pairs of field names and values e.g. {\"Name\": \"Alice\", \"Status\": \"Active\"}"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id",
+          "fields"
+        ]
+      }
+    },
+    {
+      "name": "update_record",
+      "description": "Update specific fields on an existing Airtable record (PATCH — unspecified fields are unchanged).",
+      "method": "PATCH",
+      "path": "/:base_id/:table_id/:record_id",
+      "bodyMap": {
+        "fields": "fields"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "fields",
+          "createdTime"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table name or table ID (starts with tbl)"
+          },
+          "record_id": {
+            "type": "string",
+            "description": "Record ID to update (starts with rec)"
+          },
+          "fields": {
+            "type": "object",
+            "description": "Field names and new values to set"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id",
+          "record_id",
+          "fields"
+        ]
+      }
+    },
+    {
+      "name": "delete_record",
+      "description": "Permanently delete a record from an Airtable table by its record ID.",
+      "method": "DELETE",
+      "path": "/:base_id/:table_id/:record_id",
+      "response": {
+        "pick": [
+          "id",
+          "deleted"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table name or table ID (starts with tbl)"
+          },
+          "record_id": {
+            "type": "string",
+            "description": "Record ID to delete (starts with rec)"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id",
+          "record_id"
+        ]
+      }
+    },
+    {
+      "name": "create_records_bulk",
+      "description": "Create up to 10 records at once in an Airtable table using a single API call.",
+      "method": "POST",
+      "path": "/:base_id/:table_id",
+      "bodyMap": {
+        "records": "records"
+      },
+      "response": {
+        "pick": [
+          "records"
+        ],
+        "limit": 10
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table name or table ID (starts with tbl)"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fields": {
+                  "type": "object",
+                  "description": "Field values for this record"
+                }
+              },
+              "required": [
+                "fields"
+              ]
+            },
+            "description": "Array of record objects each with a 'fields' property (max 10)"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id",
+          "records"
+        ]
+      }
+    },
+    {
+      "name": "update_records_bulk",
+      "description": "Update up to 10 records at once in an Airtable table. Only specified fields are updated (PATCH semantics).",
+      "method": "PATCH",
+      "path": "/:base_id/:table_id",
+      "bodyMap": {
+        "records": "records"
+      },
+      "response": {
+        "pick": [
+          "records"
+        ],
+        "limit": 10
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table name or table ID (starts with tbl)"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Record ID to update (starts with rec)"
+                },
+                "fields": {
+                  "type": "object",
+                  "description": "Field values to update"
+                }
+              },
+              "required": [
+                "id",
+                "fields"
+              ]
+            },
+            "description": "Array of record objects each with 'id' and 'fields' properties (max 10)"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id",
+          "records"
+        ]
+      }
+    },
+    {
+      "name": "delete_records_bulk",
+      "description": "Delete up to 10 records at once from an Airtable table. This is permanent and cannot be undone.",
+      "method": "DELETE",
+      "path": "/:base_id/:table_id",
+      "queryMap": {
+        "records": "records[]"
+      },
+      "response": {
+        "pick": [
+          "records"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table name or table ID (starts with tbl)"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of record IDs to delete (max 10)"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id",
+          "records"
+        ]
+      }
+    },
+    {
+      "name": "list_bases",
+      "description": "List all Airtable bases accessible by the API key — use to discover base IDs needed for other calls.",
+      "method": "GET",
+      "path": "/meta/bases",
+      "response": {
+        "pick": [
+          "bases"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "string",
+            "description": "Pagination offset token from previous response"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_base_schema",
+      "description": "Get the full schema of an Airtable base including all table IDs, table names, and field definitions. Use before querying to discover field names.",
+      "method": "GET",
+      "path": "/meta/bases/:base_id/tables",
+      "response": {
+        "pick": [
+          "tables"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          }
+        },
+        "required": [
+          "base_id"
+        ]
+      }
+    },
+    {
+      "name": "list_views",
+      "description": "List all saved views in a specific Airtable table including grid, gallery, kanban, and calendar views.",
+      "method": "GET",
+      "path": "/meta/bases/:base_id/tables/:table_id/views",
+      "response": {
+        "pick": [
+          "views"
+        ],
+        "limit": 50,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table ID (starts with tbl)"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id"
+        ]
+      }
+    },
+    {
+      "name": "list_fields",
+      "description": "List all fields (columns) in a specific Airtable table with their types and configurations.",
+      "method": "GET",
+      "path": "/meta/bases/:base_id/tables/:table_id/fields",
+      "response": {
+        "pick": [
+          "fields"
+        ],
+        "limit": 100,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table ID (starts with tbl)"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id"
+        ]
+      }
+    },
+    {
+      "name": "create_field",
+      "description": "Add a new field (column) to an Airtable table.",
+      "method": "POST",
+      "path": "/meta/bases/:base_id/tables/:table_id/fields",
+      "bodyMap": {
+        "name": "name",
+        "type": "type",
+        "description": "description",
+        "options": "options"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "type",
+          "description",
+          "options"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table ID (starts with tbl)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "singleLineText",
+              "multilineText",
+              "email",
+              "url",
+              "number",
+              "currency",
+              "percent",
+              "duration",
+              "rating",
+              "checkbox",
+              "singleSelect",
+              "multipleSelects",
+              "date",
+              "dateTime",
+              "phoneNumber",
+              "attachments",
+              "linkedRecord",
+              "formula",
+              "rollup",
+              "count",
+              "lookup"
+            ],
+            "description": "Field type"
+          },
+          "description": {
+            "type": "string",
+            "description": "Field description"
+          },
+          "options": {
+            "type": "object",
+            "description": "Type-specific options (e.g. choices for singleSelect, linkedTableId for linkedRecord)"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id",
+          "name",
+          "type"
+        ]
+      }
+    },
+    {
+      "name": "list_workspaces",
+      "description": "List all Airtable workspaces the user has access to, including workspace IDs needed for creating new bases.",
+      "method": "GET",
+      "path": "/meta/workspaces",
+      "response": {
+        "pick": [
+          "workspaces"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "create_table",
+      "description": "Create a new table in an Airtable base with an initial set of fields.",
+      "method": "POST",
+      "path": "/meta/bases/:base_id/tables",
+      "bodyMap": {
+        "name": "name",
+        "description": "description",
+        "fields": "fields"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "description",
+          "fields",
+          "views"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Airtable base ID (starts with app)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Table name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional table description"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "name",
+                "type"
+              ]
+            },
+            "description": "Initial fields for the table — the first field becomes the primary field"
+          }
+        },
+        "required": [
+          "base_id",
+          "name",
+          "fields"
+        ]
+      }
+    }
+  ]
+}

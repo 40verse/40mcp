@@ -1,0 +1,107 @@
+{
+  "_comment": "40mcp × emulate — points to local emulate Slack server (port 4003). Run: npx emulate --service slack --seed ../.emulate/emulate.config.yaml",
+  "name": "slack-emulate",
+  "version": "1.0.0",
+  "baseUrl": "http://localhost:4003",
+  "auth": {
+    "type": "bearer",
+    "envVar": "SLACK_BOT_TOKEN",
+    "_note": "Any non-empty string works — emulate does not validate tokens"
+  },
+  "tools": [
+    {
+      "name": "post_message",
+      "description": "Post a message to a Slack channel (emulated — writes to local state).",
+      "method": "POST",
+      "path": "/api/chat.postMessage",
+      "bodyMap": { "channel_id": "channel", "message_text": "text", "thread_ts": "thread_ts" },
+      "response": { "pick": ["ok", "ts", "channel"] },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": { "type": "string", "description": "Channel ID or name" },
+          "message_text": { "type": "string", "description": "Message text (supports mrkdwn)" },
+          "thread_ts": { "type": "string", "description": "Thread timestamp to reply to" }
+        },
+        "required": ["channel_id", "message_text"]
+      }
+    },
+    {
+      "name": "list_channels",
+      "description": "List public channels in the workspace (emulated).",
+      "method": "GET",
+      "path": "/api/conversations.list",
+      "queryMap": { "channel_types": "types", "max_results": "limit" },
+      "response": { "pick": ["channels"], "limit": 50, "summary": true },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_types": { "type": "string", "description": "Comma-separated types: public_channel, private_channel, mpim, im" },
+          "max_results": { "type": "integer", "description": "Max results (1-200)" }
+        }
+      }
+    },
+    {
+      "name": "get_channel",
+      "description": "Get details of a specific channel (emulated).",
+      "method": "GET",
+      "path": "/api/conversations.info",
+      "queryMap": { "channel_id": "channel" },
+      "response": { "pick": ["channel"] },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": { "type": "string", "description": "Channel ID" }
+        },
+        "required": ["channel_id"]
+      }
+    },
+    {
+      "name": "list_messages",
+      "description": "Retrieve message history from a channel (emulated).",
+      "method": "GET",
+      "path": "/api/conversations.history",
+      "queryMap": { "channel_id": "channel", "max_results": "limit", "oldest_ts": "oldest", "latest_ts": "latest" },
+      "response": { "pick": ["messages", "has_more"], "limit": 25, "summary": true },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": { "type": "string", "description": "Channel ID" },
+          "max_results": { "type": "integer", "description": "Max results (1-999)" },
+          "oldest_ts": { "type": "string", "description": "Start of time range (Unix timestamp)" },
+          "latest_ts": { "type": "string", "description": "End of time range (Unix timestamp)" }
+        },
+        "required": ["channel_id"]
+      }
+    },
+    {
+      "name": "list_users",
+      "description": "List members of the workspace (emulated).",
+      "method": "GET",
+      "path": "/api/users.list",
+      "queryMap": { "max_results": "limit" },
+      "response": { "pick": ["members"], "limit": 50, "summary": true },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_results": { "type": "integer", "description": "Max results" }
+        }
+      }
+    },
+    {
+      "name": "get_user",
+      "description": "Get details of a specific user (emulated).",
+      "method": "GET",
+      "path": "/api/users.info",
+      "queryMap": { "user_id": "user" },
+      "response": { "pick": ["user"] },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": { "type": "string", "description": "Slack user ID" }
+        },
+        "required": ["user_id"]
+      }
+    }
+  ]
+}

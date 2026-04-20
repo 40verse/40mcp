@@ -1,0 +1,25 @@
+node_modules
+*.tgz
+*.log
+
+# Credentials / secrets
+.vault
+.vault.*
+*.vault.json
+.env
+.env.*
+*.pem
+*.key
+
+# Repo metadata + dev tooling
+.git
+.github/
+.gitignore
+.dockerignore
+test/
+.claude/
+.emulate/
+
+# Docs and examples — keep image lean
+docs/
+examples/

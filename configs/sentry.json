@@ -1,0 +1,712 @@
+{
+  "name": "sentry",
+  "usage": {
+    "envVars": [
+      "SENTRY_AUTH_TOKEN"
+    ],
+    "scopes": [
+      "project:read",
+      "project:write",
+      "event:read",
+      "org:read",
+      "release:write"
+    ],
+    "setup": "Create an auth token at https://sentry.io/settings/account/api/auth-tokens/ with the required scopes."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://sentry.io/api/0",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "SENTRY_AUTH_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "list_projects",
+      "description": "List all Sentry projects the authenticated token has access to.",
+      "method": "GET",
+      "path": "/projects/",
+      "response": {
+        "pick": [
+          "id",
+          "slug",
+          "name",
+          "organization.slug",
+          "status",
+          "platform",
+          "dateCreated"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor for next page"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_project",
+      "description": "Retrieve full details of a specific Sentry project by organization and project slug.",
+      "method": "GET",
+      "path": "/projects/:org_slug/:project_slug/",
+      "response": {
+        "pick": [
+          "id",
+          "slug",
+          "name",
+          "platform",
+          "status",
+          "organization",
+          "dateCreated",
+          "firstEvent",
+          "features",
+          "stats"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "description": "Organization slug from Sentry URL"
+          },
+          "project_slug": {
+            "type": "string",
+            "description": "Project slug from Sentry URL"
+          }
+        },
+        "required": [
+          "org_slug",
+          "project_slug"
+        ]
+      }
+    },
+    {
+      "name": "create_project",
+      "policy": "require_approval",
+      "description": "Create a new Sentry project within an organization and team.",
+      "method": "POST",
+      "path": "/teams/:org_slug/:team_slug/projects/",
+      "bodyMap": {
+        "name": "name",
+        "platform": "platform",
+        "default_rules": "default_rules"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "slug",
+          "name",
+          "platform",
+          "dateCreated",
+          "status"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "description": "Organization slug"
+          },
+          "team_slug": {
+            "type": "string",
+            "description": "Team slug to create the project under"
+          },
+          "name": {
+            "type": "string",
+            "description": "Project name"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Platform identifier (e.g. javascript, python, node)"
+          },
+          "default_rules": {
+            "type": "boolean",
+            "description": "Create default alert rules for the project (default true)"
+          }
+        },
+        "required": [
+          "org_slug",
+          "team_slug",
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "list_issues",
+      "description": "List unresolved error issues for a project, sorted by frequency or date.",
+      "method": "GET",
+      "path": "/projects/:org_slug/:project_slug/issues/",
+      "queryMap": {
+        "issue_query": "query",
+        "sort_by": "sort",
+        "max_results": "limit",
+        "cursor": "cursor"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "culprit",
+          "level",
+          "status",
+          "count",
+          "userCount",
+          "firstSeen",
+          "lastSeen",
+          "shortId"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "description": "Organization slug from Sentry URL"
+          },
+          "project_slug": {
+            "type": "string",
+            "description": "Project slug from Sentry URL"
+          },
+          "issue_query": {
+            "type": "string",
+            "description": "Sentry search query (e.g. 'is:unresolved level:error', 'assigned:me')"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "date",
+              "new",
+              "priority",
+              "freq",
+              "user"
+            ],
+            "description": "Sort order for results"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max issues to return (default 25)"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor"
+          }
+        },
+        "required": [
+          "org_slug",
+          "project_slug"
+        ]
+      }
+    },
+    {
+      "name": "get_issue",
+      "description": "Retrieve full details of a specific Sentry issue including stack trace metadata and assignee.",
+      "method": "GET",
+      "path": "/issues/:issue_id/",
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "culprit",
+          "level",
+          "status",
+          "assignedTo",
+          "count",
+          "userCount",
+          "firstSeen",
+          "lastSeen",
+          "metadata",
+          "tags",
+          "shortId"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Sentry issue ID (numeric or short ID like PROJ-123)"
+          }
+        },
+        "required": [
+          "issue_id"
+        ]
+      }
+    },
+    {
+      "name": "update_issue",
+      "policy": "require_approval",
+      "description": "Update a Sentry issue — change status, assignee, or other properties.",
+      "method": "PUT",
+      "path": "/issues/:issue_id/",
+      "bodyMap": {
+        "status": "status",
+        "assignee": "assignedTo",
+        "has_seen": "hasSeen",
+        "is_bookmarked": "isBookmarked",
+        "is_subscribed": "isSubscribed"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "status",
+          "assignedTo",
+          "hasSeen",
+          "isBookmarked",
+          "title",
+          "shortId"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Sentry issue ID"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "resolvedInNextRelease",
+              "unresolved",
+              "ignored"
+            ],
+            "description": "New status for the issue"
+          },
+          "assignee": {
+            "type": "string",
+            "description": "Username or email to assign the issue to"
+          },
+          "has_seen": {
+            "type": "boolean",
+            "description": "Mark the issue as seen/unseen"
+          },
+          "is_bookmarked": {
+            "type": "boolean",
+            "description": "Bookmark or unbookmark the issue"
+          },
+          "is_subscribed": {
+            "type": "boolean",
+            "description": "Subscribe or unsubscribe from notifications"
+          }
+        },
+        "required": [
+          "issue_id"
+        ]
+      }
+    },
+    {
+      "name": "delete_issue",
+      "policy": "require_approval",
+      "description": "Permanently delete a Sentry issue. This cannot be undone.",
+      "method": "DELETE",
+      "path": "/issues/:issue_id/",
+      "response": {
+        "pick": []
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Sentry issue ID to delete"
+          }
+        },
+        "required": [
+          "issue_id"
+        ]
+      }
+    },
+    {
+      "name": "list_events",
+      "description": "List individual error events for a specific issue, including stack traces.",
+      "method": "GET",
+      "path": "/issues/:issue_id/events/",
+      "queryMap": {
+        "full_details": "full",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "message",
+          "dateCreated",
+          "tags",
+          "user",
+          "contexts",
+          "entries"
+        ],
+        "limit": 10,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Sentry issue ID"
+          },
+          "full_details": {
+            "type": "boolean",
+            "description": "Include full event details including stack trace (default false)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max events to return"
+          }
+        },
+        "required": [
+          "issue_id"
+        ]
+      }
+    },
+    {
+      "name": "get_event",
+      "description": "Retrieve a single specific event by its event ID, with full stack trace and context.",
+      "method": "GET",
+      "path": "/projects/:org_slug/:project_slug/events/:event_id/",
+      "response": {
+        "pick": [
+          "id",
+          "message",
+          "platform",
+          "dateCreated",
+          "tags",
+          "user",
+          "contexts",
+          "entries",
+          "errors",
+          "groupID"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "description": "Organization slug"
+          },
+          "project_slug": {
+            "type": "string",
+            "description": "Project slug"
+          },
+          "event_id": {
+            "type": "string",
+            "description": "Event ID (UUID without hyphens)"
+          }
+        },
+        "required": [
+          "org_slug",
+          "project_slug",
+          "event_id"
+        ]
+      }
+    },
+    {
+      "name": "resolve_issue",
+      "policy": "require_approval",
+      "description": "Mark a Sentry issue as resolved to clear it from the active issues list.",
+      "method": "PUT",
+      "path": "/issues/:issue_id/",
+      "bodyMap": {
+        "status": "status",
+        "assignee": "assignedTo"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "status",
+          "assignedTo",
+          "title"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Sentry issue ID"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "resolvedInNextRelease",
+              "unresolved",
+              "ignored"
+            ],
+            "description": "New status for the issue"
+          },
+          "assignee": {
+            "type": "string",
+            "description": "Username or email to assign the issue to"
+          }
+        },
+        "required": [
+          "issue_id",
+          "status"
+        ]
+      }
+    },
+    {
+      "name": "list_releases",
+      "description": "List releases for a project to track deployment history and associated issues.",
+      "method": "GET",
+      "path": "/projects/:org_slug/:project_slug/releases/",
+      "queryMap": {
+        "query": "query",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "version",
+          "shortVersion",
+          "dateCreated",
+          "dateReleased",
+          "newGroups",
+          "projects"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "description": "Organization slug"
+          },
+          "project_slug": {
+            "type": "string",
+            "description": "Project slug"
+          },
+          "query": {
+            "type": "string",
+            "description": "Filter releases by version string"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max releases to return"
+          }
+        },
+        "required": [
+          "org_slug",
+          "project_slug"
+        ]
+      }
+    },
+    {
+      "name": "create_release",
+      "policy": "require_approval",
+      "description": "Create a new release in Sentry to associate commits and set up source maps.",
+      "method": "POST",
+      "path": "/organizations/:org_slug/releases/",
+      "bodyMap": {
+        "version": "version",
+        "ref": "ref",
+        "url": "url",
+        "date_started": "dateStarted",
+        "projects": "projects"
+      },
+      "response": {
+        "pick": [
+          "version",
+          "shortVersion",
+          "dateCreated",
+          "projects",
+          "ref",
+          "url"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "description": "Organization slug"
+          },
+          "version": {
+            "type": "string",
+            "description": "Release version identifier (e.g. git SHA, semver tag, or custom string)"
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of project slugs to associate with this release"
+          },
+          "ref": {
+            "type": "string",
+            "description": "A short description of the release — an alternative to the version (e.g. git branch name)"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL that points to the release (e.g. GitHub compare URL)"
+          },
+          "date_started": {
+            "type": "string",
+            "description": "ISO 8601 datetime when the release started"
+          }
+        },
+        "required": [
+          "org_slug",
+          "version",
+          "projects"
+        ]
+      }
+    },
+    {
+      "name": "get_release",
+      "description": "Retrieve details of a specific release including associated commits and new issues introduced.",
+      "method": "GET",
+      "path": "/organizations/:org_slug/releases/:version/",
+      "response": {
+        "pick": [
+          "version",
+          "shortVersion",
+          "dateCreated",
+          "dateReleased",
+          "projects",
+          "ref",
+          "url",
+          "newGroups",
+          "commitCount",
+          "deployCount"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "description": "Organization slug"
+          },
+          "version": {
+            "type": "string",
+            "description": "Release version identifier"
+          }
+        },
+        "required": [
+          "org_slug",
+          "version"
+        ]
+      }
+    },
+    {
+      "name": "finalize_release",
+      "policy": "require_approval",
+      "description": "Mark a Sentry release as finalized by setting its release date. Issues found after this point are attributed to subsequent releases.",
+      "method": "PUT",
+      "path": "/organizations/:org_slug/releases/:version/",
+      "bodyMap": {
+        "date_released": "dateReleased"
+      },
+      "response": {
+        "pick": [
+          "version",
+          "shortVersion",
+          "dateCreated",
+          "dateReleased",
+          "projects"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "description": "Organization slug"
+          },
+          "version": {
+            "type": "string",
+            "description": "Release version identifier to finalize"
+          },
+          "date_released": {
+            "type": "string",
+            "description": "ISO 8601 datetime to stamp as the release date (defaults to now if omitted)"
+          }
+        },
+        "required": [
+          "org_slug",
+          "version"
+        ]
+      }
+    },
+    {
+      "name": "list_release_deploys",
+      "description": "List all deploys associated with a Sentry release, including environment and deploy time.",
+      "method": "GET",
+      "path": "/organizations/:org_slug/releases/:version/deploys/",
+      "response": {
+        "pick": [
+          "id",
+          "environment",
+          "dateStarted",
+          "dateFinished",
+          "name",
+          "url"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "description": "Organization slug"
+          },
+          "version": {
+            "type": "string",
+            "description": "Release version identifier"
+          }
+        },
+        "required": [
+          "org_slug",
+          "version"
+        ]
+      }
+    },
+    {
+      "name": "list_organizations",
+      "description": "List Sentry organizations the token has access to — use to discover org_slug values.",
+      "method": "GET",
+      "path": "/organizations/",
+      "response": {
+        "pick": [
+          "id",
+          "slug",
+          "name",
+          "dateCreated",
+          "status"
+        ],
+        "limit": 10,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "_comment": "40mcp MCP-linking config. Points at two public upstream MCP servers: Microsoft Learn Docs and HuggingFace. Use with: 40mcp link configs/microsoft-huggingface-bridge.mcp.json",
+  "mcpServers": {
+    "msdocs": {
+      "url": "https://learn.microsoft.com/api/mcp",
+      "_source": "https://github.com/microsoftdocs/mcp",
+      "_note": "Remote HTTP/SSE MCP server. Exposes microsoft_docs_search, microsoft_code_sample_search, microsoft_docs_fetch."
+    },
+    "hf": {
+      "url": "https://huggingface.co/mcp",
+      "_source": "https://github.com/huggingface/hf-mcp-server",
+      "_note": "Remote HTTP MCP server. Exposes model / dataset / space search, paper search, and gr_* inference tools. Public read-only access works without a token."
+    }
+  }
+}

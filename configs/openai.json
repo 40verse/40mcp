@@ -1,0 +1,304 @@
+{
+  "_comment": "OpenAI API config. Required env vars: OPENAI_API_KEY (from https://platform.openai.com/api-keys). Required scopes: depends on key permissions — model read, completions, embeddings, files. Docs: https://platform.openai.com/docs/api-reference",
+  "name": "openai",
+  "usage": {
+    "envVars": [
+      "OPENAI_API_KEY"
+    ],
+    "setup": "Create an API key at https://platform.openai.com/api-keys. Ensure your account has credits and appropriate usage limits."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.openai.com/v1",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "OPENAI_API_KEY"
+  },
+  "tools": [
+    {
+      "name": "chat_completion",
+      "description": "Send a chat completion request to an OpenAI model (e.g. gpt-4o, gpt-4-turbo, gpt-3.5-turbo). Returns the model's response message.",
+      "method": "POST",
+      "path": "/chat/completions",
+      "response": {
+        "pick": [
+          "id",
+          "model",
+          "choices",
+          "usage"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Model ID (e.g. 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo')"
+          },
+          "messages": {
+            "type": "array",
+            "description": "Array of message objects with 'role' (system/user/assistant) and 'content' fields",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ]
+            }
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Sampling temperature 0-2 (default 1). Lower = more deterministic."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "Max tokens to generate in the response"
+          },
+          "top_p": {
+            "type": "number",
+            "description": "Nucleus sampling probability (0-1)"
+          },
+          "stop": {
+            "type": "string",
+            "description": "Stop sequence — generation halts when this string is produced"
+          }
+        },
+        "required": [
+          "model",
+          "messages"
+        ]
+      }
+    },
+    {
+      "name": "create_embedding",
+      "description": "Generate vector embeddings for one or more input texts using an OpenAI embedding model (e.g. text-embedding-3-small, text-embedding-ada-002).",
+      "method": "POST",
+      "path": "/embeddings",
+      "response": {
+        "pick": [
+          "model",
+          "data",
+          "usage"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Embedding model ID (e.g. 'text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002')"
+          },
+          "input": {
+            "description": "Text or array of texts to embed",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "dimensions": {
+            "type": "integer",
+            "description": "Output vector dimensions (only supported by text-embedding-3 models)"
+          },
+          "encoding_format": {
+            "type": "string",
+            "enum": [
+              "float",
+              "base64"
+            ],
+            "description": "Format for returned embeddings (default 'float')"
+          }
+        },
+        "required": [
+          "model",
+          "input"
+        ]
+      }
+    },
+    {
+      "name": "list_models",
+      "description": "List all OpenAI models available to your API key, including GPT-4, GPT-3.5, embedding, and fine-tuned models.",
+      "method": "GET",
+      "path": "/models",
+      "response": {
+        "pick": [
+          "data"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_model",
+      "description": "Retrieve metadata for a specific OpenAI model by ID, including ownership and capabilities.",
+      "method": "GET",
+      "path": "/models/:model_id",
+      "response": {
+        "pick": [
+          "id",
+          "object",
+          "owned_by",
+          "created"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "description": "Model ID (e.g. 'gpt-4o', 'text-embedding-3-small')"
+          }
+        },
+        "required": [
+          "model_id"
+        ]
+      }
+    },
+    {
+      "name": "list_files",
+      "description": "List files uploaded to your OpenAI account (e.g. for fine-tuning or Assistants). Returns file metadata including purpose and size.",
+      "method": "GET",
+      "path": "/files",
+      "queryMap": {
+        "purpose": "purpose"
+      },
+      "response": {
+        "pick": [
+          "data"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "fine-tune",
+              "assistants",
+              "batch",
+              "vision"
+            ],
+            "description": "Filter files by intended purpose"
+          }
+        }
+      }
+    },
+    {
+      "name": "delete_file",
+      "description": "Delete an uploaded file from your OpenAI account by file ID.",
+      "method": "DELETE",
+      "path": "/files/:file_id",
+      "policy": "require_approval",
+      "response": {
+        "pick": [
+          "id",
+          "deleted"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "description": "File ID to delete (file-...)"
+          }
+        },
+        "required": [
+          "file_id"
+        ]
+      }
+    },
+    {
+      "name": "create_image",
+      "description": "Generate images from a text prompt using DALL-E 3 or DALL-E 2. Returns image URLs.",
+      "method": "POST",
+      "path": "/images/generations",
+      "response": {
+        "pick": [
+          "created",
+          "data"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Text description of the image to generate"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "dall-e-3",
+              "dall-e-2"
+            ],
+            "description": "Image model to use (default 'dall-e-2')"
+          },
+          "n": {
+            "type": "integer",
+            "description": "Number of images to generate (1-10 for dall-e-2, only 1 for dall-e-3)"
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "256x256",
+              "512x512",
+              "1024x1024",
+              "1792x1024",
+              "1024x1792"
+            ],
+            "description": "Image size (dall-e-3 supports 1024x1024, 1792x1024, 1024x1792)"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "hd"
+            ],
+            "description": "Image quality — hd is only available for dall-e-3"
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "url",
+              "b64_json"
+            ],
+            "description": "Return image as URL (expires after 1 hour) or base64 JSON"
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      }
+    }
+  ]
+}

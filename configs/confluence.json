@@ -1,0 +1,258 @@
+{
+  "name": "confluence",
+  "usage": {
+    "envVars": [
+      "CONFLUENCE_EMAIL",
+      "CONFLUENCE_API_TOKEN",
+      "CONFLUENCE_DOMAIN"
+    ],
+    "envVarDescriptions": {
+      "CONFLUENCE_DOMAIN": "Your Atlassian subdomain (e.g. 'acme' for acme.atlassian.net) — substituted into baseUrl."
+    },
+    "setup": "Create an Atlassian API token at https://id.atlassian.com/manage-profile/security/api-tokens. Set CONFLUENCE_EMAIL to your Atlassian account email. Set CONFLUENCE_DOMAIN to your site's subdomain (the '<subdomain>' in https://<subdomain>.atlassian.net)."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://{CONFLUENCE_DOMAIN}.atlassian.net/wiki/rest/api",
+  "strictSsrf": true,
+  "auth": {
+    "type": "basic",
+    "envVar": "CONFLUENCE_EMAIL",
+    "passwordEnvVar": "CONFLUENCE_API_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "search",
+      "description": "Search Confluence content using CQL (Confluence Query Language).",
+      "method": "GET",
+      "path": "/content/search",
+      "queryMap": {
+        "cql": "cql",
+        "limit": "limit",
+        "start": "start",
+        "expand": "expand"
+      },
+      "response": {
+        "pick": [
+          "results",
+          "totalSize",
+          "start",
+          "limit"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cql": {
+            "type": "string",
+            "description": "CQL query string (e.g., 'type=page AND space.key=DEV AND text~\"authentication\"')"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results to return (default 25, max 250)"
+          },
+          "start": {
+            "type": "integer",
+            "description": "Pagination offset"
+          },
+          "expand": {
+            "type": "string",
+            "description": "Comma-separated list of properties to expand (e.g., 'body.view,version')"
+          }
+        },
+        "required": [
+          "cql"
+        ]
+      }
+    },
+    {
+      "name": "get_page",
+      "description": "Retrieve a Confluence page by ID, including its content.",
+      "method": "GET",
+      "path": "/content/:page_id",
+      "queryMap": {
+        "expand": "expand"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "type",
+          "space",
+          "version",
+          "body",
+          "_links"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "description": "Confluence page ID (numeric)"
+          },
+          "expand": {
+            "type": "string",
+            "description": "Properties to expand (default: 'body.view,version,space')"
+          }
+        },
+        "required": [
+          "page_id"
+        ]
+      }
+    },
+    {
+      "name": "create_page",
+      "description": "Create a new Confluence page in a space.",
+      "method": "POST",
+      "path": "/content",
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "space_key": {
+            "type": "string",
+            "description": "Space key (e.g., 'DEV', 'DOCS')"
+          },
+          "title": {
+            "type": "string",
+            "description": "Page title"
+          },
+          "body_html": {
+            "type": "string",
+            "description": "Page body in Confluence storage format (XHTML-like)"
+          },
+          "parent_id": {
+            "type": "string",
+            "description": "Parent page ID to nest under (optional)"
+          }
+        },
+        "required": [
+          "space_key",
+          "title",
+          "body_html"
+        ]
+      }
+    },
+    {
+      "name": "update_page",
+      "description": "Update an existing Confluence page. Requires the current version number.",
+      "method": "PUT",
+      "path": "/content/:page_id",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "description": "Page ID to update"
+          },
+          "title": {
+            "type": "string",
+            "description": "Updated page title"
+          },
+          "body_html": {
+            "type": "string",
+            "description": "Updated page body in storage format"
+          },
+          "version_number": {
+            "type": "integer",
+            "description": "Current version number (required to avoid conflicts)"
+          }
+        },
+        "required": [
+          "page_id",
+          "title",
+          "body_html",
+          "version_number"
+        ]
+      }
+    },
+    {
+      "name": "list_spaces",
+      "description": "List Confluence spaces the user has access to.",
+      "method": "GET",
+      "path": "/space",
+      "queryMap": {
+        "limit": "limit",
+        "type": "type",
+        "status": "status"
+      },
+      "response": {
+        "pick": [
+          "results",
+          "size"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max spaces to return"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "global",
+              "personal"
+            ],
+            "description": "Space type filter"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "current",
+              "archived"
+            ],
+            "description": "Space status filter"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_page_children",
+      "description": "List child pages of a Confluence page.",
+      "method": "GET",
+      "path": "/content/:page_id/child/page",
+      "queryMap": {
+        "limit": "limit",
+        "start": "start"
+      },
+      "response": {
+        "pick": [
+          "results",
+          "size"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "description": "Parent page ID"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max children to return"
+          },
+          "start": {
+            "type": "integer",
+            "description": "Pagination offset"
+          }
+        },
+        "required": [
+          "page_id"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+/**
+ * Example: Wrap the Petstore API as an MCP server in ~60 lines.
+ *
+ * Run:   node examples/petstore.js
+ * Config: Add to .mcp.json:
+ *   { "mcpServers": { "petstore": { "command": "node", "args": ["examples/petstore.js"] } } }
+ */
+
+import { createRestBridge } from '../src/index.js';
+
+await createRestBridge({
+  name: 'petstore',
+  version: '1.0.0',
+  baseUrl: 'https://petstore3.swagger.io/api/v3',
+
+  tools: [
+    {
+      name: 'list_pets',
+      description: 'List pets by status (available, pending, sold).',
+      method: 'GET',
+      path: '/pet/findByStatus',
+      queryMap: { pet_status: 'status' },
+      inputSchema: {
+        type: 'object',
+        properties: {
+          pet_status: {
+            type: 'string',
+            enum: ['available', 'pending', 'sold'],
+            description: 'Pet status filter',
+          },
+        },
+        required: ['pet_status'],
+      },
+    },
+    {
+      name: 'get_pet',
+      description: 'Get a pet by its ID.',
+      method: 'GET',
+      path: '/pet/:pet_id',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          pet_id: { type: 'integer', description: 'Pet ID' },
+        },
+        required: ['pet_id'],
+      },
+    },
+    {
+      name: 'add_pet',
+      description: 'Add a new pet to the store.',
+      method: 'POST',
+      path: '/pet',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name:   { type: 'string', description: 'Pet name' },
+          status: { type: 'string', enum: ['available', 'pending', 'sold'] },
+        },
+        required: ['name'],
+      },
+    },
+    {
+      name: 'delete_pet',
+      description: 'Delete a pet by ID.',
+      method: 'DELETE',
+      path: '/pet/:pet_id',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          pet_id: { type: 'integer', description: 'Pet ID' },
+        },
+        required: ['pet_id'],
+      },
+    },
+  ],
+}).start();

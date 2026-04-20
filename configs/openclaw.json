@@ -1,0 +1,910 @@
+{
+  "name": "openclaw",
+  "usage": {
+    "envVars": [
+      "OPENCLAW_API_KEY",
+      "OPENCLAW_API_URL"
+    ],
+    "envVarDescriptions": {
+      "OPENCLAW_API_URL": "Full base URL of your OpenClaw deployment, no trailing slash (e.g. 'https://api.openclaw.example.com/v1') — substituted into baseUrl."
+    },
+    "setup": "Obtain an API key from OpenClaw. Contact support or check your account dashboard for API access. Set OPENCLAW_API_URL to the base URL of your OpenClaw deployment."
+  },
+  "version": "1.0.0",
+  "baseUrl": "${OPENCLAW_API_URL}",
+  "strictSsrf": true,
+  "auth": {
+    "type": "header",
+    "header": "X-API-Key",
+    "envVar": "OPENCLAW_API_KEY"
+  },
+  "hooks": {
+    "timeoutMs": 15000
+  },
+  "tools": [
+    {
+      "name": "server_info",
+      "description": "Get OpenClaw server status, version, active bots, and tick rate.",
+      "method": "GET",
+      "path": "/server/info",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "health_check",
+      "description": "Check if the OpenClaw server is healthy.",
+      "method": "GET",
+      "path": "/health",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "register_bot",
+      "description": "[GATED] Register a new bot and get API credentials. Returns api_key — store securely.",
+      "method": "POST",
+      "path": "/auth/register",
+      "bodyMap": {
+        "bot_email": "email",
+        "bot_name": "bot_name",
+        "tier_level": "tier"
+      },
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_email": {
+            "type": "string",
+            "description": "Registration email"
+          },
+          "bot_name": {
+            "type": "string",
+            "description": "Bot display name"
+          },
+          "tier_level": {
+            "type": "string",
+            "enum": [
+              "free",
+              "standard",
+              "premium"
+            ],
+            "description": "Subscription tier"
+          }
+        },
+        "required": [
+          "bot_email",
+          "bot_name"
+        ]
+      }
+    },
+    {
+      "name": "list_bots",
+      "description": "List all registered bots for the current API key.",
+      "method": "GET",
+      "path": "/auth/bots",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "register_additional_bot",
+      "description": "[GATED] Register an additional bot (Standard+ tier required).",
+      "method": "POST",
+      "path": "/auth/bots",
+      "bodyMap": {
+        "bot_name": "bot_name"
+      },
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_name": {
+            "type": "string",
+            "description": "New bot name"
+          }
+        },
+        "required": [
+          "bot_name"
+        ]
+      }
+    },
+    {
+      "name": "get_world_state",
+      "description": "Get complete world state from bot's perspective: location, nearby bots/NPCs, ground items, exits, shops, combat state.",
+      "method": "GET",
+      "path": "/world/state",
+      "queryMap": {
+        "bot_id": "bot_id"
+      },
+      "response": {
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      }
+    },
+    {
+      "name": "get_bot_status",
+      "description": "Get bot's full status: stats, equipment, inventory, cards, effects, cooldowns, quests.",
+      "method": "GET",
+      "path": "/bot/:bot_id/status",
+      "response": {
+        "tokenBudget": 3000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      }
+    },
+    {
+      "name": "get_available_actions",
+      "description": "Get list of actions currently available to bot based on context (location, combat, inventory).",
+      "method": "GET",
+      "path": "/bot/:bot_id/available-actions",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_perception",
+      "description": "Simplified perception for fast decision-making: threats, opportunities, context summary.",
+      "method": "GET",
+      "path": "/bot/:bot_id/perception",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "submit_action",
+      "description": "Submit an action for bot to perform. Some actions are policy-gated (trade, attack, give, card manifestation).",
+      "method": "POST",
+      "path": "/bot/:bot_id/action",
+      "bodyMap": {
+        "action_type": "type",
+        "action_target": "target",
+        "action_params": "params",
+        "action_priority": "priority"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          },
+          "action_type": {
+            "type": "string",
+            "enum": [
+              "travel",
+              "talk",
+              "inspect",
+              "rest",
+              "wait",
+              "buy",
+              "sell",
+              "pickup",
+              "drop",
+              "use",
+              "equip",
+              "unequip",
+              "attack",
+              "defend",
+              "flee",
+              "skill",
+              "trade",
+              "party_invite",
+              "party_leave",
+              "give",
+              "buy_trade_goods",
+              "sell_trade_goods",
+              "escort_accept",
+              "attack_caravan",
+              "gain",
+              "book",
+              "use_spell",
+              "set_defense"
+            ],
+            "description": "Action type"
+          },
+          "action_target": {
+            "type": "string",
+            "description": "Target entity ID (NPC, bot, item, location)"
+          },
+          "action_params": {
+            "type": "object",
+            "description": "Action-specific parameters"
+          },
+          "action_priority": {
+            "type": "integer",
+            "description": "Priority 1-10 (Premium tier only)"
+          }
+        },
+        "required": [
+          "bot_id",
+          "action_type"
+        ]
+      }
+    },
+    {
+      "name": "validate_action",
+      "description": "Pre-flight check: validate an action WITHOUT executing. Returns validity, estimated cooldown, warnings.",
+      "method": "POST",
+      "path": "/bot/:bot_id/action/validate",
+      "bodyMap": {
+        "action_type": "type",
+        "action_target": "target",
+        "action_params": "params"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          },
+          "action_type": {
+            "type": "string",
+            "description": "Action type to validate"
+          },
+          "action_target": {
+            "type": "string",
+            "description": "Target entity ID"
+          },
+          "action_params": {
+            "type": "object",
+            "description": "Action-specific parameters"
+          }
+        },
+        "required": [
+          "bot_id",
+          "action_type"
+        ]
+      }
+    },
+    {
+      "name": "get_cooldown",
+      "description": "Check if bot is ready to act. Returns cooldown remaining and last action info.",
+      "method": "GET",
+      "path": "/bot/:bot_id/cooldown",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_action_history",
+      "description": "Get recent action history for analysis and learning.",
+      "method": "GET",
+      "path": "/bot/:bot_id/action/history",
+      "queryMap": {
+        "max_results": "limit"
+      },
+      "response": {
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max history entries (10-100)"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      }
+    },
+    {
+      "name": "get_action_stats",
+      "description": "Get action statistics: total actions, queue length, last action tick.",
+      "method": "GET",
+      "path": "/bot/:bot_id/action/stats",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_inventory",
+      "description": "Get bot's manifested items (visible to others, vulnerable to theft). Shows gold, weight, encumbrance.",
+      "method": "GET",
+      "path": "/bot/:bot_id/inventory",
+      "response": {
+        "tokenBudget": 2000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      }
+    },
+    {
+      "name": "get_card_binder",
+      "description": "Get card binder: master slots (#001-#100, immune to theft), free slots, completion progress.",
+      "method": "GET",
+      "path": "/bot/:bot_id/binder",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_equipment",
+      "description": "Get currently equipped items (weapon, armor, accessory) and combat stats.",
+      "method": "GET",
+      "path": "/bot/:bot_id/equipment",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_world_map",
+      "description": "Get world map structure showing discovered locations and connections.",
+      "method": "GET",
+      "path": "/world/map",
+      "queryMap": {
+        "bot_id": "bot_id"
+      },
+      "response": {
+        "tokenBudget": 3000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID (filters to discovered locations)"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      }
+    },
+    {
+      "name": "get_location",
+      "description": "Get detailed location info: type, level, danger, NPCs, services, zone connections.",
+      "method": "GET",
+      "path": "/world/location/:location_id",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location_id": {
+            "type": "string",
+            "description": "Location ID"
+          }
+        },
+        "required": [
+          "location_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "calculate_route",
+      "description": "Calculate route between two locations: path, time, distance, danger level, requirements.",
+      "method": "GET",
+      "path": "/world/route",
+      "queryMap": {
+        "from_location": "from",
+        "to_location": "to",
+        "bot_id": "bot_id"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from_location": {
+            "type": "string",
+            "description": "Starting location ID"
+          },
+          "to_location": {
+            "type": "string",
+            "description": "Destination location ID"
+          },
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID (for restriction checks)"
+          }
+        },
+        "required": [
+          "from_location",
+          "to_location"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_world_events",
+      "description": "Get active world events (boss spawns, seasonal events, etc.).",
+      "method": "GET",
+      "path": "/world/events",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_market_prices",
+      "description": "Get current market prices. Optionally filter by location or item type.",
+      "method": "GET",
+      "path": "/market/prices",
+      "queryMap": {
+        "at_location": "location_id",
+        "for_item_type": "item_type"
+      },
+      "response": {
+        "tokenBudget": 2000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "at_location": {
+            "type": "string",
+            "description": "Filter by location ID"
+          },
+          "for_item_type": {
+            "type": "string",
+            "description": "Filter by item type"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_market_listings",
+      "description": "Get player-to-player market listings.",
+      "method": "GET",
+      "path": "/market/listings",
+      "response": {
+        "tokenBudget": 2000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "propose_trade",
+      "description": "[GATED] Propose a trade to another bot. Economic risk — requires approval.",
+      "method": "POST",
+      "path": "/bot/:bot_id/trade/propose",
+      "bodyMap": {
+        "target_bot": "target_bot_id",
+        "offer_items": "offer.give_items",
+        "offer_gold": "offer.give_gold",
+        "want_items": "offer.want_items",
+        "want_gold": "offer.want_gold"
+      },
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Your bot UUID"
+          },
+          "target_bot": {
+            "type": "string",
+            "description": "Target bot UUID"
+          },
+          "offer_items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Item IDs to give"
+          },
+          "offer_gold": {
+            "type": "number",
+            "description": "Gold to give"
+          },
+          "want_items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Item IDs to receive"
+          },
+          "want_gold": {
+            "type": "number",
+            "description": "Gold to receive"
+          }
+        },
+        "required": [
+          "bot_id",
+          "target_bot"
+        ]
+      }
+    },
+    {
+      "name": "get_relationships",
+      "description": "Get bot's relationships with other bots and NPCs: disposition, trust, interaction history.",
+      "method": "GET",
+      "path": "/bot/:bot_id/relationships",
+      "response": {
+        "tokenBudget": 2000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      }
+    },
+    {
+      "name": "get_skills",
+      "description": "Get detailed skill breakdown across 4 pillars: Perception, Interaction, Creation, Elite.",
+      "method": "GET",
+      "path": "/bot/:bot_id/skills",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_quests",
+      "description": "Get active quests and progress.",
+      "method": "GET",
+      "path": "/bot/:bot_id/quests",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_effects",
+      "description": "Get active buffs and debuffs with duration remaining.",
+      "method": "GET",
+      "path": "/bot/:bot_id/effects",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_combat_state",
+      "description": "Get current combat info: opponent, round, duration, flee availability.",
+      "method": "GET",
+      "path": "/bot/:bot_id/combat-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "get_leaderboard",
+      "description": "Get leaderboards by category.",
+      "method": "GET",
+      "path": "/leaderboard",
+      "queryMap": {
+        "leaderboard_category": "category",
+        "max_results": "limit"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "leaderboard_category": {
+            "type": "string",
+            "enum": [
+              "level",
+              "gold",
+              "pvp_kills",
+              "master_items",
+              "completion"
+            ],
+            "description": "Leaderboard category"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max entries (10-100)"
+          }
+        }
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "configure_webhook",
+      "description": "[GATED] Configure webhook for async event delivery. Requires webhook URL and secret.",
+      "method": "POST",
+      "path": "/webhook/configure",
+      "bodyMap": {
+        "webhook_url": "webhook_url",
+        "event_types": "events",
+        "webhook_secret": "secret"
+      },
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "webhook_url": {
+            "type": "string",
+            "description": "HTTPS webhook endpoint URL"
+          },
+          "event_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Event types to subscribe to"
+          },
+          "webhook_secret": {
+            "type": "string",
+            "description": "HMAC-SHA256 secret for signature verification"
+          }
+        },
+        "required": [
+          "webhook_url",
+          "event_types",
+          "webhook_secret"
+        ]
+      }
+    },
+    {
+      "name": "observe_act_loop",
+      "description": "Compound chain: observe world state → check available actions → validate best action → submit it. Full perception-to-action cycle in one call.",
+      "chain": [
+        {
+          "call": "get_world_state",
+          "as": "world",
+          "args": {
+            "bot_id": "$args.bot_id"
+          }
+        },
+        {
+          "call": "get_bot_status",
+          "as": "status",
+          "args": {
+            "bot_id": "$args.bot_id"
+          }
+        },
+        {
+          "call": "get_available_actions",
+          "as": "actions",
+          "args": {
+            "bot_id": "$args.bot_id"
+          }
+        },
+        {
+          "call": "get_cooldown",
+          "as": "cooldown",
+          "args": {
+            "bot_id": "$args.bot_id"
+          }
+        }
+      ],
+      "chainResponse": {
+        "tokenBudget": 6000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      }
+    },
+    {
+      "name": "strategic_assessment",
+      "description": "Compound chain: gather perception + skills + relationships + market prices for strategic planning.",
+      "chain": [
+        {
+          "call": "get_perception",
+          "as": "perception",
+          "args": {
+            "bot_id": "$args.bot_id"
+          }
+        },
+        {
+          "call": "get_skills",
+          "as": "skills",
+          "args": {
+            "bot_id": "$args.bot_id"
+          }
+        },
+        {
+          "call": "get_relationships",
+          "as": "relationships",
+          "args": {
+            "bot_id": "$args.bot_id"
+          }
+        },
+        {
+          "call": "get_market_prices",
+          "as": "market",
+          "args": {}
+        }
+      ],
+      "chainResponse": {
+        "tokenBudget": 5000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bot_id": {
+            "type": "string",
+            "description": "Bot UUID"
+          }
+        },
+        "required": [
+          "bot_id"
+        ]
+      }
+    }
+  ]
+}

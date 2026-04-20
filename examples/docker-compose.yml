@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  40mcp:
+    image: ghcr.io/40verse/40mcp:0.1.1-beta.0
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./my-config.json:/config.json:ro
+    env_file: .env
+    restart: unless-stopped

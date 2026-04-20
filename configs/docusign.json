@@ -1,0 +1,257 @@
+{
+  "name": "docusign",
+  "usage": {
+    "envVars": [
+      "DOCUSIGN_ACCESS_TOKEN",
+      "DOCUSIGN_ACCOUNT_ID"
+    ],
+    "envVarDescriptions": {
+      "DOCUSIGN_ACCOUNT_ID": "Your DocuSign account GUID (from the account's API info) — substituted into baseUrl."
+    },
+    "scopes": [
+      "signature",
+      "extended"
+    ],
+    "setup": "Obtain an access token via DocuSign OAuth at https://developers.docusign.com/platform/auth/. Use the JWT or Authorization Code Grant flow. Set DOCUSIGN_ACCOUNT_ID to the account GUID shown under Settings > Apps and Keys."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://www.docusign.net/restapi/v2.1/accounts/{DOCUSIGN_ACCOUNT_ID}",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "DOCUSIGN_ACCESS_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "list_envelopes",
+      "description": "List DocuSign envelopes for the account, optionally filtered by status or date.",
+      "method": "GET",
+      "path": "/envelopes",
+      "queryMap": {
+        "from_date": "from_date",
+        "to_date": "to_date",
+        "status": "status",
+        "count": "count",
+        "start_position": "start_position",
+        "search_text": "search_text"
+      },
+      "response": {
+        "pick": [
+          "envelopes",
+          "totalSetSize",
+          "startPosition",
+          "endPosition"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from_date": {
+            "type": "string",
+            "description": "Start date filter (ISO 8601, e.g. '2024-01-01')"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End date filter (ISO 8601)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "delivered",
+              "signed",
+              "completed",
+              "declined",
+              "voided",
+              "created"
+            ],
+            "description": "Filter by envelope status"
+          },
+          "count": {
+            "type": "integer",
+            "description": "Max envelopes to return (default 25)"
+          },
+          "start_position": {
+            "type": "integer",
+            "description": "Pagination start position"
+          },
+          "search_text": {
+            "type": "string",
+            "description": "Search text to filter envelopes"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_envelope",
+      "description": "Get details of a specific DocuSign envelope including status and signers.",
+      "method": "GET",
+      "path": "/envelopes/:envelope_id",
+      "response": {
+        "pick": [
+          "envelopeId",
+          "status",
+          "emailSubject",
+          "sentDateTime",
+          "completedDateTime",
+          "recipients",
+          "createdDateTime",
+          "statusChangedDateTime"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "envelope_id": {
+            "type": "string",
+            "description": "DocuSign envelope ID (UUID)"
+          }
+        },
+        "required": [
+          "envelope_id"
+        ]
+      }
+    },
+    {
+      "name": "get_envelope_recipients",
+      "description": "List all recipients (signers, CC, viewers) for a DocuSign envelope and their signing status.",
+      "method": "GET",
+      "path": "/envelopes/:envelope_id/recipients",
+      "response": {
+        "pick": [
+          "signers",
+          "carbonCopies",
+          "certifiedDeliveries",
+          "currentRoutingOrder"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "envelope_id": {
+            "type": "string",
+            "description": "Envelope ID"
+          }
+        },
+        "required": [
+          "envelope_id"
+        ]
+      }
+    },
+    {
+      "name": "list_envelope_documents",
+      "description": "List documents attached to a DocuSign envelope.",
+      "method": "GET",
+      "path": "/envelopes/:envelope_id/documents",
+      "response": {
+        "pick": [
+          "envelopeDocuments"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "envelope_id": {
+            "type": "string",
+            "description": "Envelope ID"
+          }
+        },
+        "required": [
+          "envelope_id"
+        ]
+      }
+    },
+    {
+      "name": "send_envelope",
+      "description": "Create and send a new DocuSign envelope for signature.",
+      "method": "POST",
+      "path": "/envelopes",
+      "policy": "require_approval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email_subject": {
+            "type": "string",
+            "description": "Email subject line for the signing request"
+          },
+          "email_blurb": {
+            "type": "string",
+            "description": "Optional email body message"
+          },
+          "signers": {
+            "type": "array",
+            "description": "List of signer objects with name, email, and routing order",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "routing_order": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "document_base64": {
+            "type": "string",
+            "description": "Base64-encoded document content"
+          },
+          "document_name": {
+            "type": "string",
+            "description": "Document filename (e.g., 'contract.pdf')"
+          }
+        },
+        "required": [
+          "email_subject",
+          "signers",
+          "document_base64",
+          "document_name"
+        ]
+      }
+    },
+    {
+      "name": "void_envelope",
+      "description": "Void (cancel) a sent DocuSign envelope.",
+      "method": "PUT",
+      "path": "/envelopes/:envelope_id",
+      "policy": "require_approval",
+      "bodyMap": {
+        "status": "status",
+        "voidedReason": "voidedReason"
+      },
+      "response": {
+        "pick": [
+          "envelopeId",
+          "status"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "envelope_id": {
+            "type": "string",
+            "description": "Envelope ID to void"
+          },
+          "voided_reason": {
+            "type": "string",
+            "description": "Reason for voiding the envelope"
+          }
+        },
+        "required": [
+          "envelope_id",
+          "voided_reason"
+        ]
+      }
+    }
+  ]
+}

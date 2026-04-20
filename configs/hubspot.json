@@ -1,0 +1,925 @@
+{
+  "name": "hubspot",
+  "usage": {
+    "envVars": [
+      "HUBSPOT_ACCESS_TOKEN"
+    ],
+    "scopes": [
+      "crm.objects.contacts.read",
+      "crm.objects.contacts.write",
+      "crm.objects.companies.read",
+      "crm.objects.deals.read",
+      "tickets"
+    ],
+    "setup": "Create a private app in HubSpot Settings -> Integrations -> Private Apps with the required scopes. Copy the access token."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.hubapi.com",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "HUBSPOT_ACCESS_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "list_contacts",
+      "description": "List CRM contacts with optional property selection and pagination.",
+      "method": "GET",
+      "path": "/crm/v3/objects/contacts",
+      "queryMap": {
+        "max_results": "limit",
+        "after_cursor": "after",
+        "properties": "properties",
+        "sort_by": "sort"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.firstname",
+          "properties.lastname",
+          "properties.email",
+          "properties.phone",
+          "properties.company",
+          "properties.createdate"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_results": {
+            "type": "integer",
+            "description": "Max contacts to return (1-100)"
+          },
+          "after_cursor": {
+            "type": "string",
+            "description": "Pagination cursor from previous response"
+          },
+          "properties": {
+            "type": "string",
+            "description": "Comma-separated list of additional properties to include"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_contact",
+      "description": "Retrieve a specific CRM contact by ID including standard properties.",
+      "method": "GET",
+      "path": "/crm/v3/objects/contacts/:contact_id",
+      "queryMap": {
+        "properties": "properties"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "string",
+            "description": "HubSpot contact ID"
+          },
+          "properties": {
+            "type": "string",
+            "description": "Comma-separated list of properties to return (e.g. email,phone,company)"
+          }
+        },
+        "required": [
+          "contact_id"
+        ]
+      }
+    },
+    {
+      "name": "create_contact",
+      "description": "Create a new CRM contact with email and optional additional properties.",
+      "method": "POST",
+      "path": "/crm/v3/objects/contacts",
+      "bodyMap": {
+        "email": "properties.email",
+        "first_name": "properties.firstname",
+        "last_name": "properties.lastname",
+        "phone": "properties.phone",
+        "company": "properties.company",
+        "job_title": "properties.jobtitle"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.email",
+          "properties.firstname",
+          "properties.lastname",
+          "properties.createdate"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Contact email address (must be unique)"
+          },
+          "first_name": {
+            "type": "string",
+            "description": "Contact first name"
+          },
+          "last_name": {
+            "type": "string",
+            "description": "Contact last name"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Contact phone number"
+          },
+          "company": {
+            "type": "string",
+            "description": "Company name"
+          },
+          "job_title": {
+            "type": "string",
+            "description": "Contact job title"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      }
+    },
+    {
+      "name": "update_contact",
+      "description": "Update properties on an existing CRM contact.",
+      "method": "PATCH",
+      "path": "/crm/v3/objects/contacts/:contact_id",
+      "bodyMap": {
+        "email": "properties.email",
+        "first_name": "properties.firstname",
+        "last_name": "properties.lastname",
+        "phone": "properties.phone",
+        "company": "properties.company",
+        "job_title": "properties.jobtitle"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.email",
+          "properties.firstname",
+          "properties.lastname",
+          "properties.lastmodifieddate"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "string",
+            "description": "HubSpot contact ID"
+          },
+          "email": {
+            "type": "string",
+            "description": "New email address"
+          },
+          "first_name": {
+            "type": "string",
+            "description": "New first name"
+          },
+          "last_name": {
+            "type": "string",
+            "description": "New last name"
+          },
+          "phone": {
+            "type": "string",
+            "description": "New phone number"
+          },
+          "company": {
+            "type": "string",
+            "description": "New company name"
+          },
+          "job_title": {
+            "type": "string",
+            "description": "New job title"
+          }
+        },
+        "required": [
+          "contact_id"
+        ]
+      }
+    },
+    {
+      "name": "delete_contact",
+      "description": "Permanently delete a CRM contact by ID. This action cannot be undone.",
+      "method": "DELETE",
+      "path": "/crm/v3/objects/contacts/:contact_id",
+      "response": {
+        "pick": []
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "string",
+            "description": "HubSpot contact ID to delete"
+          }
+        },
+        "required": [
+          "contact_id"
+        ]
+      }
+    },
+    {
+      "name": "list_deals",
+      "description": "List CRM deals with optional property selection and pagination.",
+      "method": "GET",
+      "path": "/crm/v3/objects/deals",
+      "queryMap": {
+        "max_results": "limit",
+        "after_cursor": "after",
+        "properties": "properties"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.dealname",
+          "properties.amount",
+          "properties.dealstage",
+          "properties.pipeline",
+          "properties.closedate",
+          "properties.createdate"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_results": {
+            "type": "integer",
+            "description": "Max deals to return (1-100)"
+          },
+          "after_cursor": {
+            "type": "string",
+            "description": "Pagination cursor from previous response"
+          },
+          "properties": {
+            "type": "string",
+            "description": "Comma-separated additional properties to include"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_deal",
+      "description": "Retrieve a specific CRM deal by ID including pipeline stage and amount.",
+      "method": "GET",
+      "path": "/crm/v3/objects/deals/:deal_id",
+      "queryMap": {
+        "properties": "properties"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deal_id": {
+            "type": "string",
+            "description": "HubSpot deal ID"
+          },
+          "properties": {
+            "type": "string",
+            "description": "Comma-separated list of properties to return"
+          }
+        },
+        "required": [
+          "deal_id"
+        ]
+      }
+    },
+    {
+      "name": "create_deal",
+      "description": "Create a new CRM deal with name, pipeline stage, and optional amount.",
+      "method": "POST",
+      "path": "/crm/v3/objects/deals",
+      "bodyMap": {
+        "deal_name": "properties.dealname",
+        "pipeline": "properties.pipeline",
+        "deal_stage": "properties.dealstage",
+        "amount": "properties.amount",
+        "close_date": "properties.closedate",
+        "owner_id": "properties.hubspot_owner_id"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.dealname",
+          "properties.dealstage",
+          "properties.amount",
+          "properties.createdate"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deal_name": {
+            "type": "string",
+            "description": "Name of the deal"
+          },
+          "pipeline": {
+            "type": "string",
+            "description": "Pipeline ID the deal belongs to"
+          },
+          "deal_stage": {
+            "type": "string",
+            "description": "Stage ID within the pipeline (e.g. appointmentscheduled, qualifiedtobuy, closedwon)"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Deal value as a string number (e.g. '5000')"
+          },
+          "close_date": {
+            "type": "string",
+            "description": "Expected close date in milliseconds epoch or YYYY-MM-DD"
+          },
+          "owner_id": {
+            "type": "string",
+            "description": "HubSpot user ID of the deal owner"
+          }
+        },
+        "required": [
+          "deal_name",
+          "pipeline",
+          "deal_stage"
+        ]
+      }
+    },
+    {
+      "name": "update_deal",
+      "description": "Update properties on an existing CRM deal such as stage, amount, or close date.",
+      "method": "PATCH",
+      "path": "/crm/v3/objects/deals/:deal_id",
+      "bodyMap": {
+        "deal_name": "properties.dealname",
+        "pipeline": "properties.pipeline",
+        "deal_stage": "properties.dealstage",
+        "amount": "properties.amount",
+        "close_date": "properties.closedate",
+        "owner_id": "properties.hubspot_owner_id"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.dealname",
+          "properties.dealstage",
+          "properties.amount",
+          "properties.lastmodifieddate"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deal_id": {
+            "type": "string",
+            "description": "HubSpot deal ID"
+          },
+          "deal_name": {
+            "type": "string",
+            "description": "New deal name"
+          },
+          "pipeline": {
+            "type": "string",
+            "description": "New pipeline ID"
+          },
+          "deal_stage": {
+            "type": "string",
+            "description": "New stage ID"
+          },
+          "amount": {
+            "type": "string",
+            "description": "New deal value"
+          },
+          "close_date": {
+            "type": "string",
+            "description": "New expected close date"
+          },
+          "owner_id": {
+            "type": "string",
+            "description": "New owner user ID"
+          }
+        },
+        "required": [
+          "deal_id"
+        ]
+      }
+    },
+    {
+      "name": "list_companies",
+      "description": "List CRM companies with optional property selection and pagination.",
+      "method": "GET",
+      "path": "/crm/v3/objects/companies",
+      "queryMap": {
+        "max_results": "limit",
+        "after_cursor": "after",
+        "properties": "properties"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.name",
+          "properties.domain",
+          "properties.industry",
+          "properties.city",
+          "properties.country",
+          "properties.numberofemployees",
+          "properties.createdate"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_results": {
+            "type": "integer",
+            "description": "Max companies to return (1-100)"
+          },
+          "after_cursor": {
+            "type": "string",
+            "description": "Pagination cursor from previous response"
+          },
+          "properties": {
+            "type": "string",
+            "description": "Comma-separated additional properties to include"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_company",
+      "description": "Retrieve a specific CRM company by ID including domain, industry, and employee count.",
+      "method": "GET",
+      "path": "/crm/v3/objects/companies/:company_id",
+      "queryMap": {
+        "properties": "properties"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "company_id": {
+            "type": "string",
+            "description": "HubSpot company ID"
+          },
+          "properties": {
+            "type": "string",
+            "description": "Comma-separated list of properties to return"
+          }
+        },
+        "required": [
+          "company_id"
+        ]
+      }
+    },
+    {
+      "name": "create_company",
+      "description": "Create a new CRM company record.",
+      "method": "POST",
+      "path": "/crm/v3/objects/companies",
+      "bodyMap": {
+        "name": "properties.name",
+        "domain": "properties.domain",
+        "industry": "properties.industry",
+        "city": "properties.city",
+        "country": "properties.country",
+        "phone": "properties.phone",
+        "num_employees": "properties.numberofemployees"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.name",
+          "properties.domain",
+          "properties.createdate"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Company name"
+          },
+          "domain": {
+            "type": "string",
+            "description": "Company website domain (e.g. acme.com)"
+          },
+          "industry": {
+            "type": "string",
+            "description": "Industry (e.g. TECHNOLOGY, FINANCE)"
+          },
+          "city": {
+            "type": "string",
+            "description": "City where company is based"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Company phone number"
+          },
+          "num_employees": {
+            "type": "string",
+            "description": "Number of employees"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "update_company",
+      "description": "Update properties on an existing CRM company.",
+      "method": "PATCH",
+      "path": "/crm/v3/objects/companies/:company_id",
+      "bodyMap": {
+        "name": "properties.name",
+        "domain": "properties.domain",
+        "industry": "properties.industry",
+        "city": "properties.city",
+        "country": "properties.country",
+        "phone": "properties.phone",
+        "num_employees": "properties.numberofemployees"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.name",
+          "properties.domain",
+          "properties.lastmodifieddate"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "company_id": {
+            "type": "string",
+            "description": "HubSpot company ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "New company name"
+          },
+          "domain": {
+            "type": "string",
+            "description": "New domain"
+          },
+          "industry": {
+            "type": "string",
+            "description": "New industry"
+          },
+          "city": {
+            "type": "string",
+            "description": "New city"
+          },
+          "country": {
+            "type": "string",
+            "description": "New country"
+          },
+          "phone": {
+            "type": "string",
+            "description": "New phone number"
+          },
+          "num_employees": {
+            "type": "string",
+            "description": "New employee count"
+          }
+        },
+        "required": [
+          "company_id"
+        ]
+      }
+    },
+    {
+      "name": "search_crm",
+      "description": "Search CRM objects (contacts, deals, companies) using filter conditions on properties.",
+      "method": "POST",
+      "path": "/crm/v3/objects/:object_type/search",
+      "bodyMap": {
+        "filter_property": "filterGroups[0].filters[0].propertyName",
+        "filter_operator": "filterGroups[0].filters[0].operator",
+        "filter_value": "filterGroups[0].filters[0].value",
+        "properties": "properties",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "total",
+          "results"
+        ],
+        "limit": 25,
+        "summary": true
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "object_type": {
+            "type": "string",
+            "enum": [
+              "contacts",
+              "deals",
+              "companies",
+              "tickets"
+            ],
+            "description": "CRM object type to search"
+          },
+          "filter_property": {
+            "type": "string",
+            "description": "Property name to filter on (e.g. email, dealstage, name)"
+          },
+          "filter_operator": {
+            "type": "string",
+            "enum": [
+              "EQ",
+              "NEQ",
+              "CONTAINS_TOKEN",
+              "GTE",
+              "LTE",
+              "HAS_PROPERTY"
+            ],
+            "description": "Filter comparison operator"
+          },
+          "filter_value": {
+            "type": "string",
+            "description": "Value to compare against"
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Properties to include in results"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results to return (1-100)"
+          }
+        },
+        "required": [
+          "object_type",
+          "filter_property",
+          "filter_operator",
+          "filter_value"
+        ]
+      }
+    },
+    {
+      "name": "list_tickets",
+      "description": "List CRM support tickets with optional property selection and pagination.",
+      "method": "GET",
+      "path": "/crm/v3/objects/tickets",
+      "queryMap": {
+        "max_results": "limit",
+        "after_cursor": "after",
+        "properties": "properties"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.subject",
+          "properties.hs_ticket_priority",
+          "properties.hs_pipeline_stage",
+          "properties.createdate",
+          "properties.hs_lastmodifieddate"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_results": {
+            "type": "integer",
+            "description": "Max tickets to return (1-100)"
+          },
+          "after_cursor": {
+            "type": "string",
+            "description": "Pagination cursor from previous response"
+          },
+          "properties": {
+            "type": "string",
+            "description": "Comma-separated additional properties to include"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_ticket",
+      "description": "Retrieve a specific CRM support ticket by ID.",
+      "method": "GET",
+      "path": "/crm/v3/objects/tickets/:ticket_id",
+      "queryMap": {
+        "properties": "properties"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "description": "HubSpot ticket ID"
+          },
+          "properties": {
+            "type": "string",
+            "description": "Comma-separated list of properties to return"
+          }
+        },
+        "required": [
+          "ticket_id"
+        ]
+      }
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a new CRM support ticket.",
+      "method": "POST",
+      "path": "/crm/v3/objects/tickets",
+      "bodyMap": {
+        "subject": "properties.subject",
+        "content": "properties.content",
+        "priority": "properties.hs_ticket_priority",
+        "pipeline": "properties.hs_pipeline",
+        "pipeline_stage": "properties.hs_pipeline_stage",
+        "owner_id": "properties.hubspot_owner_id"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.subject",
+          "properties.hs_ticket_priority",
+          "properties.hs_pipeline_stage",
+          "properties.createdate"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "Ticket subject / title"
+          },
+          "content": {
+            "type": "string",
+            "description": "Ticket description"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "description": "Ticket priority"
+          },
+          "pipeline": {
+            "type": "string",
+            "description": "Pipeline ID the ticket belongs to"
+          },
+          "pipeline_stage": {
+            "type": "string",
+            "description": "Stage ID within the pipeline (e.g. 1=New, 2=Waiting, 4=Closed)"
+          },
+          "owner_id": {
+            "type": "string",
+            "description": "HubSpot user ID of the ticket owner"
+          }
+        },
+        "required": [
+          "subject",
+          "pipeline",
+          "pipeline_stage"
+        ]
+      }
+    },
+    {
+      "name": "update_ticket",
+      "description": "Update properties on an existing CRM support ticket.",
+      "method": "PATCH",
+      "path": "/crm/v3/objects/tickets/:ticket_id",
+      "bodyMap": {
+        "subject": "properties.subject",
+        "content": "properties.content",
+        "priority": "properties.hs_ticket_priority",
+        "pipeline_stage": "properties.hs_pipeline_stage",
+        "owner_id": "properties.hubspot_owner_id"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "properties.subject",
+          "properties.hs_ticket_priority",
+          "properties.hs_pipeline_stage",
+          "properties.hs_lastmodifieddate"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "description": "HubSpot ticket ID"
+          },
+          "subject": {
+            "type": "string",
+            "description": "New ticket subject"
+          },
+          "content": {
+            "type": "string",
+            "description": "New ticket description"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "description": "New priority"
+          },
+          "pipeline_stage": {
+            "type": "string",
+            "description": "New pipeline stage ID"
+          },
+          "owner_id": {
+            "type": "string",
+            "description": "New owner user ID"
+          }
+        },
+        "required": [
+          "ticket_id"
+        ]
+      }
+    },
+    {
+      "name": "get_pipeline",
+      "description": "Get details of a specific CRM pipeline including all stages with their IDs and display order.",
+      "method": "GET",
+      "path": "/crm/v3/pipelines/:object_type/:pipeline_id",
+      "response": {
+        "pick": [
+          "id",
+          "label",
+          "displayOrder",
+          "stages"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "object_type": {
+            "type": "string",
+            "enum": [
+              "deals",
+              "tickets"
+            ],
+            "description": "CRM object type the pipeline belongs to"
+          },
+          "pipeline_id": {
+            "type": "string",
+            "description": "Pipeline ID (use 'default' for the default deal pipeline)"
+          }
+        },
+        "required": [
+          "object_type",
+          "pipeline_id"
+        ]
+      }
+    }
+  ]
+}

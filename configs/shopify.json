@@ -1,0 +1,1014 @@
+{
+  "name": "shopify",
+  "usage": {
+    "envVars": [
+      "SHOPIFY_ACCESS_TOKEN",
+      "SHOPIFY_SHOP_DOMAIN"
+    ],
+    "envVarDescriptions": {
+      "SHOPIFY_SHOP_DOMAIN": "Your shop's myshopify hostname (e.g. 'acme-store.myshopify.com') — substituted into baseUrl."
+    },
+    "scopes": [
+      "read_products",
+      "write_products",
+      "read_orders",
+      "write_orders",
+      "read_customers",
+      "write_customers"
+    ],
+    "setup": "Create a custom app in your Shopify Admin (Settings -> Apps -> Develop apps) and install it to obtain an access token with the required scopes. Set SHOPIFY_SHOP_DOMAIN to your shop's myshopify hostname (e.g. acme-store.myshopify.com)."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://${SHOPIFY_SHOP_DOMAIN}/admin/api/2024-01",
+  "strictSsrf": true,
+  "auth": {
+    "type": "header",
+    "header": "X-Shopify-Access-Token",
+    "envVar": "SHOPIFY_ACCESS_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "list_products",
+      "description": "List products in the Shopify store with optional filters by status, vendor, or product type. baseUrl uses SHOPIFY_SHOP_DOMAIN env var (e.g. mystore.myshopify.com).",
+      "method": "GET",
+      "path": "/products.json",
+      "queryMap": {
+        "limit": "limit",
+        "status": "status",
+        "vendor": "vendor",
+        "product_type": "product_type",
+        "since_id": "since_id",
+        "published_status": "published_status"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "handle",
+          "status",
+          "vendor",
+          "product_type",
+          "created_at",
+          "updated_at",
+          "variants",
+          "images"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max products to return (1-250, default 50)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived",
+              "draft"
+            ],
+            "description": "Filter by product status"
+          },
+          "vendor": {
+            "type": "string",
+            "description": "Filter by vendor name"
+          },
+          "product_type": {
+            "type": "string",
+            "description": "Filter by product type"
+          },
+          "since_id": {
+            "type": "string",
+            "description": "Return products after this product ID (pagination)"
+          },
+          "published_status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "unpublished",
+              "any"
+            ],
+            "description": "Filter by published status"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_product",
+      "description": "Retrieve full details of a specific Shopify product including all variants, images, and options.",
+      "method": "GET",
+      "path": "/products/:product_id.json",
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "body_html",
+          "vendor",
+          "product_type",
+          "handle",
+          "status",
+          "variants",
+          "options",
+          "images",
+          "created_at",
+          "updated_at"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "description": "Shopify product ID (numeric)"
+          }
+        },
+        "required": [
+          "product_id"
+        ]
+      }
+    },
+    {
+      "name": "create_product",
+      "description": "Create a new product in the Shopify store with title, description, vendor, and optional variants.",
+      "method": "POST",
+      "path": "/products.json",
+      "bodyMap": {
+        "title": "product.title",
+        "body_html": "product.body_html",
+        "vendor": "product.vendor",
+        "product_type": "product.product_type",
+        "status": "product.status",
+        "tags": "product.tags",
+        "variants": "product.variants",
+        "images": "product.images"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "handle",
+          "status",
+          "vendor",
+          "created_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Product title"
+          },
+          "body_html": {
+            "type": "string",
+            "description": "Product description as HTML"
+          },
+          "vendor": {
+            "type": "string",
+            "description": "Vendor or manufacturer name"
+          },
+          "product_type": {
+            "type": "string",
+            "description": "Product type category"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "draft",
+              "archived"
+            ],
+            "description": "Product status (default draft)"
+          },
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated tags for the product"
+          },
+          "variants": {
+            "type": "array",
+            "description": "Array of variant objects with price, sku, inventory_quantity, etc."
+          },
+          "images": {
+            "type": "array",
+            "description": "Array of image objects with src URL"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      }
+    },
+    {
+      "name": "update_product",
+      "description": "Update an existing Shopify product title, description, status, tags, or other properties.",
+      "method": "PUT",
+      "path": "/products/:product_id.json",
+      "bodyMap": {
+        "title": "product.title",
+        "body_html": "product.body_html",
+        "vendor": "product.vendor",
+        "product_type": "product.product_type",
+        "status": "product.status",
+        "tags": "product.tags"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "title",
+          "handle",
+          "status",
+          "updated_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "description": "Shopify product ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "New product title"
+          },
+          "body_html": {
+            "type": "string",
+            "description": "New product description (HTML)"
+          },
+          "vendor": {
+            "type": "string",
+            "description": "New vendor name"
+          },
+          "product_type": {
+            "type": "string",
+            "description": "New product type"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "draft",
+              "archived"
+            ],
+            "description": "New product status"
+          },
+          "tags": {
+            "type": "string",
+            "description": "New comma-separated tags"
+          }
+        },
+        "required": [
+          "product_id"
+        ]
+      }
+    },
+    {
+      "name": "delete_product",
+      "description": "Permanently delete a product from the Shopify store. This cannot be undone.",
+      "method": "DELETE",
+      "path": "/products/:product_id.json",
+      "response": {
+        "pick": []
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "description": "Shopify product ID to delete"
+          }
+        },
+        "required": [
+          "product_id"
+        ]
+      }
+    },
+    {
+      "name": "list_orders",
+      "description": "List orders with optional filters by status, customer, or date. Returns order totals, line items, and fulfillment status.",
+      "method": "GET",
+      "path": "/orders.json",
+      "queryMap": {
+        "limit": "limit",
+        "status": "status",
+        "financial_status": "financial_status",
+        "fulfillment_status": "fulfillment_status",
+        "customer_id": "customer_id",
+        "created_at_min": "created_at_min",
+        "since_id": "since_id"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "email",
+          "financial_status",
+          "fulfillment_status",
+          "total_price",
+          "currency",
+          "customer",
+          "line_items",
+          "created_at",
+          "updated_at"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max orders to return (1-250, default 50)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "cancelled",
+              "any"
+            ],
+            "description": "Filter by order status"
+          },
+          "financial_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paid",
+              "refunded",
+              "partially_paid",
+              "partially_refunded",
+              "voided"
+            ],
+            "description": "Filter by payment status"
+          },
+          "fulfillment_status": {
+            "type": "string",
+            "enum": [
+              "shipped",
+              "partial",
+              "unshipped",
+              "any",
+              "unfulfilled"
+            ],
+            "description": "Filter by fulfillment status"
+          },
+          "customer_id": {
+            "type": "string",
+            "description": "Filter orders by customer ID"
+          },
+          "created_at_min": {
+            "type": "string",
+            "description": "Return orders created after this ISO 8601 datetime"
+          },
+          "since_id": {
+            "type": "string",
+            "description": "Return orders after this order ID (pagination)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_order",
+      "description": "Retrieve full details of a specific Shopify order including line items, shipping address, and fulfillments.",
+      "method": "GET",
+      "path": "/orders/:order_id.json",
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "email",
+          "financial_status",
+          "fulfillment_status",
+          "total_price",
+          "subtotal_price",
+          "currency",
+          "customer",
+          "line_items",
+          "shipping_address",
+          "fulfillments",
+          "created_at"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "Shopify order ID (numeric)"
+          }
+        },
+        "required": [
+          "order_id"
+        ]
+      }
+    },
+    {
+      "name": "create_order",
+      "description": "Create a new order in Shopify (draft order checkout or manual order entry).",
+      "method": "POST",
+      "path": "/orders.json",
+      "bodyMap": {
+        "line_items": "order.line_items",
+        "customer": "order.customer",
+        "shipping_address": "order.shipping_address",
+        "billing_address": "order.billing_address",
+        "email": "order.email",
+        "note": "order.note",
+        "tags": "order.tags",
+        "financial_status": "order.financial_status"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "email",
+          "financial_status",
+          "total_price",
+          "currency",
+          "created_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "line_items": {
+            "type": "array",
+            "description": "Array of line item objects with variant_id and quantity"
+          },
+          "email": {
+            "type": "string",
+            "description": "Customer email address"
+          },
+          "customer": {
+            "type": "object",
+            "description": "Customer object with id or contact info"
+          },
+          "shipping_address": {
+            "type": "object",
+            "description": "Shipping address object"
+          },
+          "billing_address": {
+            "type": "object",
+            "description": "Billing address object"
+          },
+          "note": {
+            "type": "string",
+            "description": "Order note from customer or merchant"
+          },
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated tags"
+          },
+          "financial_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paid"
+            ],
+            "description": "Payment status for the order"
+          }
+        },
+        "required": [
+          "line_items"
+        ]
+      }
+    },
+    {
+      "name": "update_order",
+      "description": "Update a Shopify order note, tags, email, or shipping address.",
+      "method": "PUT",
+      "path": "/orders/:order_id.json",
+      "bodyMap": {
+        "email": "order.email",
+        "note": "order.note",
+        "tags": "order.tags",
+        "shipping_address": "order.shipping_address"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "email",
+          "note",
+          "tags",
+          "updated_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "Shopify order ID"
+          },
+          "email": {
+            "type": "string",
+            "description": "New contact email for the order"
+          },
+          "note": {
+            "type": "string",
+            "description": "New order note"
+          },
+          "tags": {
+            "type": "string",
+            "description": "New comma-separated tags"
+          },
+          "shipping_address": {
+            "type": "object",
+            "description": "Updated shipping address"
+          }
+        },
+        "required": [
+          "order_id"
+        ]
+      }
+    },
+    {
+      "name": "cancel_order",
+      "description": "Cancel an open Shopify order with an optional reason and restock inventory.",
+      "method": "POST",
+      "path": "/orders/:order_id/cancel.json",
+      "bodyMap": {
+        "reason": "reason",
+        "restock": "restock",
+        "notify": "email"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "financial_status",
+          "fulfillment_status",
+          "cancelled_at",
+          "cancel_reason"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "Shopify order ID to cancel"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "fraud",
+              "inventory",
+              "declined",
+              "other"
+            ],
+            "description": "Reason for cancellation"
+          },
+          "restock": {
+            "type": "boolean",
+            "description": "Restock the items to inventory (default false)"
+          },
+          "notify": {
+            "type": "boolean",
+            "description": "Send cancellation email to customer (default false)"
+          }
+        },
+        "required": [
+          "order_id"
+        ]
+      }
+    },
+    {
+      "name": "list_customers",
+      "description": "List customers with optional search query or email filter.",
+      "method": "GET",
+      "path": "/customers.json",
+      "queryMap": {
+        "limit": "limit",
+        "email": "email",
+        "query": "query",
+        "since_id": "since_id",
+        "created_at_min": "created_at_min"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "email",
+          "first_name",
+          "last_name",
+          "phone",
+          "orders_count",
+          "total_spent",
+          "currency",
+          "tags",
+          "created_at"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max customers to return (1-250, default 50)"
+          },
+          "email": {
+            "type": "string",
+            "description": "Filter by exact email address"
+          },
+          "query": {
+            "type": "string",
+            "description": "Search customers by name, email, phone, or tag"
+          },
+          "since_id": {
+            "type": "string",
+            "description": "Return customers after this ID (pagination)"
+          },
+          "created_at_min": {
+            "type": "string",
+            "description": "Return customers created after this ISO 8601 datetime"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_customer",
+      "description": "Retrieve full details of a specific Shopify customer including order history summary and addresses.",
+      "method": "GET",
+      "path": "/customers/:customer_id.json",
+      "response": {
+        "pick": [
+          "id",
+          "email",
+          "first_name",
+          "last_name",
+          "phone",
+          "orders_count",
+          "total_spent",
+          "currency",
+          "tags",
+          "default_address",
+          "created_at",
+          "updated_at"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "description": "Shopify customer ID (numeric)"
+          }
+        },
+        "required": [
+          "customer_id"
+        ]
+      }
+    },
+    {
+      "name": "create_customer",
+      "description": "Create a new customer in the Shopify store.",
+      "method": "POST",
+      "path": "/customers.json",
+      "bodyMap": {
+        "first_name": "customer.first_name",
+        "last_name": "customer.last_name",
+        "email": "customer.email",
+        "phone": "customer.phone",
+        "tags": "customer.tags",
+        "note": "customer.note",
+        "accepts_marketing": "customer.accepts_marketing"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "email",
+          "first_name",
+          "last_name",
+          "phone",
+          "created_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Customer email address"
+          },
+          "first_name": {
+            "type": "string",
+            "description": "Customer first name"
+          },
+          "last_name": {
+            "type": "string",
+            "description": "Customer last name"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Customer phone number"
+          },
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated tags"
+          },
+          "note": {
+            "type": "string",
+            "description": "Internal note about the customer"
+          },
+          "accepts_marketing": {
+            "type": "boolean",
+            "description": "Whether the customer has opted in to marketing emails"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      }
+    },
+    {
+      "name": "update_customer",
+      "description": "Update an existing Shopify customer's details.",
+      "method": "PUT",
+      "path": "/customers/:customer_id.json",
+      "bodyMap": {
+        "first_name": "customer.first_name",
+        "last_name": "customer.last_name",
+        "email": "customer.email",
+        "phone": "customer.phone",
+        "tags": "customer.tags",
+        "note": "customer.note"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "email",
+          "first_name",
+          "last_name",
+          "updated_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "description": "Shopify customer ID"
+          },
+          "first_name": {
+            "type": "string",
+            "description": "New first name"
+          },
+          "last_name": {
+            "type": "string",
+            "description": "New last name"
+          },
+          "email": {
+            "type": "string",
+            "description": "New email address"
+          },
+          "phone": {
+            "type": "string",
+            "description": "New phone number"
+          },
+          "tags": {
+            "type": "string",
+            "description": "New comma-separated tags"
+          },
+          "note": {
+            "type": "string",
+            "description": "New internal note"
+          }
+        },
+        "required": [
+          "customer_id"
+        ]
+      }
+    },
+    {
+      "name": "search_customers",
+      "description": "Search customers by name, email, phone number, or any other customer field.",
+      "method": "GET",
+      "path": "/customers/search.json",
+      "queryMap": {
+        "query": "query",
+        "limit": "limit",
+        "order": "order"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "email",
+          "first_name",
+          "last_name",
+          "phone",
+          "orders_count",
+          "total_spent",
+          "tags"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query (e.g. 'Bob Norman' or 'email:bob@example.com')"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max customers to return (1-250)"
+          },
+          "order": {
+            "type": "string",
+            "description": "Sort field and direction (e.g. 'last_order_date DESC')"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "list_fulfillments",
+      "description": "List fulfillments for a specific order showing tracking numbers and fulfillment status.",
+      "method": "GET",
+      "path": "/orders/:order_id/fulfillments.json",
+      "queryMap": {
+        "created_at_min": "created_at_min",
+        "limit": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "order_id",
+          "status",
+          "tracking_number",
+          "tracking_company",
+          "tracking_url",
+          "line_items",
+          "created_at"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "Shopify order ID"
+          },
+          "created_at_min": {
+            "type": "string",
+            "description": "Return fulfillments created after this ISO 8601 datetime"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max fulfillments to return"
+          }
+        },
+        "required": [
+          "order_id"
+        ]
+      }
+    },
+    {
+      "name": "list_refunds",
+      "description": "List refunds for a specific Shopify order.",
+      "method": "GET",
+      "path": "/orders/:order_id/refunds.json",
+      "response": {
+        "pick": [
+          "id",
+          "order_id",
+          "created_at",
+          "note",
+          "refund_line_items",
+          "transactions"
+        ],
+        "limit": 20,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "Shopify order ID"
+          }
+        },
+        "required": [
+          "order_id"
+        ]
+      }
+    },
+    {
+      "name": "create_refund",
+      "description": "Create a refund for a Shopify order, optionally specifying line items and restocking inventory.",
+      "method": "POST",
+      "path": "/orders/:order_id/refunds.json",
+      "bodyMap": {
+        "note": "refund.note",
+        "notify": "refund.notify",
+        "restock": "refund.restock",
+        "refund_line_items": "refund.refund_line_items",
+        "transactions": "refund.transactions"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "order_id",
+          "created_at",
+          "note",
+          "refund_line_items",
+          "transactions"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "Shopify order ID to refund"
+          },
+          "note": {
+            "type": "string",
+            "description": "Internal note about the refund"
+          },
+          "notify": {
+            "type": "boolean",
+            "description": "Send refund notification to customer (default false)"
+          },
+          "restock": {
+            "type": "boolean",
+            "description": "Restock returned items to inventory"
+          },
+          "refund_line_items": {
+            "type": "array",
+            "description": "Line items to refund — each with line_item_id, quantity, and restock_type"
+          },
+          "transactions": {
+            "type": "array",
+            "description": "Transaction objects specifying refund amount, gateway, and kind"
+          }
+        },
+        "required": [
+          "order_id"
+        ]
+      }
+    },
+    {
+      "name": "list_inventory",
+      "description": "List inventory levels across locations. Filter by location or inventory item to check stock quantities.",
+      "method": "GET",
+      "path": "/inventory_levels.json",
+      "queryMap": {
+        "location_ids": "location_ids",
+        "inventory_item_ids": "inventory_item_ids",
+        "limit": "limit"
+      },
+      "response": {
+        "pick": [
+          "inventory_item_id",
+          "location_id",
+          "available",
+          "updated_at"
+        ],
+        "limit": 50,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location_ids": {
+            "type": "string",
+            "description": "Comma-separated location IDs to filter by"
+          },
+          "inventory_item_ids": {
+            "type": "string",
+            "description": "Comma-separated inventory item IDs (found on product variants)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max records to return (1-250)"
+          }
+        }
+      }
+    }
+  ]
+}

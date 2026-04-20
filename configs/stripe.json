@@ -1,0 +1,933 @@
+{
+  "name": "stripe",
+  "usage": {
+    "envVars": [
+      "STRIPE_SECRET_KEY"
+    ],
+    "setup": "Obtain a secret API key from https://dashboard.stripe.com/apikeys. Use a restricted key in production with only the permissions your tools require."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://api.stripe.com/v1",
+  "strictSsrf": true,
+  "auth": {
+    "type": "bearer",
+    "envVar": "STRIPE_SECRET_KEY"
+  },
+  "tools": [
+    {
+      "name": "list_customers",
+      "description": "List Stripe customers with optional email filter.",
+      "method": "GET",
+      "path": "/customers",
+      "queryMap": {
+        "email_filter": "email",
+        "max_results": "limit",
+        "start_after": "starting_after"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "email",
+          "name",
+          "created",
+          "metadata"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email_filter": {
+            "type": "string",
+            "description": "Filter by exact email"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          },
+          "start_after": {
+            "type": "string",
+            "description": "Cursor for pagination (customer ID)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_customer",
+      "description": "Retrieve a specific Stripe customer by ID.",
+      "method": "GET",
+      "path": "/customers/:customer_id",
+      "response": {
+        "pick": [
+          "id",
+          "email",
+          "name",
+          "phone",
+          "created",
+          "balance",
+          "currency",
+          "default_source",
+          "metadata"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "description": "Stripe customer ID (cus_...)"
+          }
+        },
+        "required": [
+          "customer_id"
+        ]
+      }
+    },
+    {
+      "name": "create_customer",
+      "description": "Create a new Stripe customer.",
+      "method": "POST",
+      "path": "/customers",
+      "bodyMap": {
+        "customer_email": "email",
+        "customer_name": "name",
+        "customer_phone": "phone",
+        "customer_description": "description"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "email",
+          "name",
+          "created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_email": {
+            "type": "string",
+            "description": "Customer email address"
+          },
+          "customer_name": {
+            "type": "string",
+            "description": "Customer full name"
+          },
+          "customer_phone": {
+            "type": "string",
+            "description": "Customer phone number"
+          },
+          "customer_description": {
+            "type": "string",
+            "description": "Arbitrary description"
+          }
+        }
+      }
+    },
+    {
+      "name": "update_customer",
+      "description": "Update an existing Stripe customer.",
+      "method": "POST",
+      "path": "/customers/:customer_id",
+      "bodyMap": {
+        "customer_email": "email",
+        "customer_name": "name",
+        "customer_phone": "phone",
+        "customer_description": "description"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "email",
+          "name",
+          "updated"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "description": "Stripe customer ID (cus_...)"
+          },
+          "customer_email": {
+            "type": "string",
+            "description": "New email address"
+          },
+          "customer_name": {
+            "type": "string",
+            "description": "New full name"
+          },
+          "customer_phone": {
+            "type": "string",
+            "description": "New phone number"
+          },
+          "customer_description": {
+            "type": "string",
+            "description": "New description"
+          }
+        },
+        "required": [
+          "customer_id"
+        ]
+      }
+    },
+    {
+      "name": "list_products",
+      "description": "List Stripe products.",
+      "method": "GET",
+      "path": "/products",
+      "queryMap": {
+        "active_only": "active",
+        "max_results": "limit",
+        "start_after": "starting_after"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "description",
+          "active",
+          "created",
+          "metadata"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "active_only": {
+            "type": "boolean",
+            "description": "Filter to active products only"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          },
+          "start_after": {
+            "type": "string",
+            "description": "Cursor for pagination (product ID)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_product",
+      "description": "Retrieve a specific Stripe product by ID.",
+      "method": "GET",
+      "path": "/products/:product_id",
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "description",
+          "active",
+          "images",
+          "metadata",
+          "created"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "description": "Stripe product ID (prod_...)"
+          }
+        },
+        "required": [
+          "product_id"
+        ]
+      }
+    },
+    {
+      "name": "create_product",
+      "description": "Create a new Stripe product.",
+      "method": "POST",
+      "path": "/products",
+      "bodyMap": {
+        "product_name": "name",
+        "product_description": "description"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "name",
+          "active",
+          "created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "product_description": {
+            "type": "string",
+            "description": "Product description"
+          }
+        },
+        "required": [
+          "product_name"
+        ]
+      }
+    },
+    {
+      "name": "list_prices",
+      "description": "List prices, optionally filtered by product.",
+      "method": "GET",
+      "path": "/prices",
+      "queryMap": {
+        "for_product": "product",
+        "currency_filter": "currency",
+        "active_only": "active",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "product",
+          "unit_amount",
+          "currency",
+          "recurring",
+          "active",
+          "created"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "for_product": {
+            "type": "string",
+            "description": "Filter by product ID"
+          },
+          "currency_filter": {
+            "type": "string",
+            "description": "Three-letter ISO currency code"
+          },
+          "active_only": {
+            "type": "boolean",
+            "description": "Filter to active prices only"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_price",
+      "description": "Retrieve a specific Stripe price by ID.",
+      "method": "GET",
+      "path": "/prices/:price_id",
+      "response": {
+        "pick": [
+          "id",
+          "product",
+          "unit_amount",
+          "currency",
+          "recurring",
+          "active"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "price_id": {
+            "type": "string",
+            "description": "Stripe price ID (price_...)"
+          }
+        },
+        "required": [
+          "price_id"
+        ]
+      }
+    },
+    {
+      "name": "list_subscriptions",
+      "description": "List subscriptions with optional customer and status filter.",
+      "method": "GET",
+      "path": "/subscriptions",
+      "queryMap": {
+        "for_customer": "customer",
+        "sub_status": "status",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "customer",
+          "status",
+          "current_period_start",
+          "current_period_end",
+          "items",
+          "created"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "for_customer": {
+            "type": "string",
+            "description": "Filter by customer ID"
+          },
+          "sub_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "past_due",
+              "canceled",
+              "unpaid",
+              "trialing",
+              "all"
+            ],
+            "description": "Subscription status"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_subscription",
+      "description": "Retrieve a specific Stripe subscription by ID.",
+      "method": "GET",
+      "path": "/subscriptions/:subscription_id",
+      "response": {
+        "pick": [
+          "id",
+          "customer",
+          "status",
+          "current_period_start",
+          "current_period_end",
+          "cancel_at_period_end",
+          "items",
+          "metadata"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription_id": {
+            "type": "string",
+            "description": "Stripe subscription ID (sub_...)"
+          }
+        },
+        "required": [
+          "subscription_id"
+        ]
+      }
+    },
+    {
+      "name": "cancel_subscription",
+      "description": "Cancel a Stripe subscription immediately or at period end.",
+      "method": "POST",
+      "path": "/subscriptions/:subscription_id/cancel",
+      "bodyMap": {
+        "at_period_end": "cancel_at_period_end"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "status",
+          "cancel_at_period_end",
+          "canceled_at"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription_id": {
+            "type": "string",
+            "description": "Stripe subscription ID (sub_...)"
+          },
+          "at_period_end": {
+            "type": "boolean",
+            "description": "If true, cancel at end of billing period instead of immediately"
+          }
+        },
+        "required": [
+          "subscription_id"
+        ]
+      }
+    },
+    {
+      "name": "list_invoices",
+      "description": "List invoices with optional status and customer filter.",
+      "method": "GET",
+      "path": "/invoices",
+      "queryMap": {
+        "for_customer": "customer",
+        "invoice_status": "status",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "number",
+          "customer",
+          "status",
+          "total",
+          "currency",
+          "due_date",
+          "created"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "for_customer": {
+            "type": "string",
+            "description": "Filter by customer ID"
+          },
+          "invoice_status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "open",
+              "paid",
+              "uncollectible",
+              "void"
+            ],
+            "description": "Invoice status"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_invoice",
+      "description": "Retrieve a specific Stripe invoice by ID.",
+      "method": "GET",
+      "path": "/invoices/:invoice_id",
+      "response": {
+        "pick": [
+          "id",
+          "number",
+          "customer",
+          "status",
+          "total",
+          "amount_paid",
+          "amount_due",
+          "currency",
+          "due_date",
+          "hosted_invoice_url",
+          "lines"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string",
+            "description": "Stripe invoice ID (in_...)"
+          }
+        },
+        "required": [
+          "invoice_id"
+        ]
+      }
+    },
+    {
+      "name": "list_charges",
+      "description": "List charges with optional customer filter.",
+      "method": "GET",
+      "path": "/charges",
+      "queryMap": {
+        "for_customer": "customer",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "amount",
+          "currency",
+          "status",
+          "description",
+          "customer",
+          "created"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "for_customer": {
+            "type": "string",
+            "description": "Filter by customer ID"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_charge",
+      "description": "Retrieve a specific Stripe charge by ID.",
+      "method": "GET",
+      "path": "/charges/:charge_id",
+      "response": {
+        "pick": [
+          "id",
+          "amount",
+          "currency",
+          "status",
+          "description",
+          "customer",
+          "refunded",
+          "outcome",
+          "created"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "charge_id": {
+            "type": "string",
+            "description": "Stripe charge ID (ch_...)"
+          }
+        },
+        "required": [
+          "charge_id"
+        ]
+      }
+    },
+    {
+      "name": "create_refund",
+      "policy": "require_approval",
+      "description": "Create a refund for a charge or payment intent.",
+      "method": "POST",
+      "path": "/refunds",
+      "bodyMap": {
+        "charge_id": "charge",
+        "payment_intent_id": "payment_intent",
+        "refund_amount": "amount",
+        "refund_reason": "reason"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "amount",
+          "currency",
+          "status",
+          "reason",
+          "created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "charge_id": {
+            "type": "string",
+            "description": "Charge ID to refund (ch_...)"
+          },
+          "payment_intent_id": {
+            "type": "string",
+            "description": "PaymentIntent ID to refund (pi_...)"
+          },
+          "refund_amount": {
+            "type": "integer",
+            "description": "Amount to refund in smallest currency unit (cents). Omit for full refund."
+          },
+          "refund_reason": {
+            "type": "string",
+            "enum": [
+              "duplicate",
+              "fraudulent",
+              "requested_by_customer"
+            ],
+            "description": "Reason for refund"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_refunds",
+      "description": "List refunds, optionally filtered by charge.",
+      "method": "GET",
+      "path": "/refunds",
+      "queryMap": {
+        "for_charge": "charge",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "amount",
+          "currency",
+          "status",
+          "charge",
+          "reason",
+          "created"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "for_charge": {
+            "type": "string",
+            "description": "Filter by charge ID"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_payment_intents",
+      "description": "List payment intents with optional customer filter.",
+      "method": "GET",
+      "path": "/payment_intents",
+      "queryMap": {
+        "for_customer": "customer",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "amount",
+          "currency",
+          "status",
+          "customer",
+          "description",
+          "created"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "for_customer": {
+            "type": "string",
+            "description": "Filter by customer ID"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_payment_intent",
+      "description": "Retrieve a specific Stripe PaymentIntent by ID.",
+      "method": "GET",
+      "path": "/payment_intents/:payment_intent_id",
+      "response": {
+        "pick": [
+          "id",
+          "amount",
+          "currency",
+          "status",
+          "customer",
+          "description",
+          "payment_method",
+          "next_action",
+          "created"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "payment_intent_id": {
+            "type": "string",
+            "description": "Stripe PaymentIntent ID (pi_...)"
+          }
+        },
+        "required": [
+          "payment_intent_id"
+        ]
+      }
+    },
+    {
+      "name": "create_payment_intent",
+      "policy": "require_approval",
+      "description": "Create a Stripe PaymentIntent to begin a payment.",
+      "method": "POST",
+      "path": "/payment_intents",
+      "bodyMap": {
+        "intent_amount": "amount",
+        "intent_currency": "currency",
+        "for_customer": "customer",
+        "intent_description": "description",
+        "confirm_immediately": "confirm"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "client_secret",
+          "amount",
+          "currency",
+          "status",
+          "created"
+        ]
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "intent_amount": {
+            "type": "integer",
+            "description": "Amount in smallest currency unit (e.g. cents for USD)"
+          },
+          "intent_currency": {
+            "type": "string",
+            "description": "Three-letter ISO currency code (e.g. usd)"
+          },
+          "for_customer": {
+            "type": "string",
+            "description": "Customer ID to associate (cus_...)"
+          },
+          "intent_description": {
+            "type": "string",
+            "description": "Description for the payment"
+          },
+          "confirm_immediately": {
+            "type": "boolean",
+            "description": "Confirm the intent immediately (requires payment_method)"
+          }
+        },
+        "required": [
+          "intent_amount",
+          "intent_currency"
+        ]
+      }
+    },
+    {
+      "name": "get_balance",
+      "description": "Retrieve current Stripe account balance.",
+      "method": "GET",
+      "path": "/balance",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "response": {
+        "tokenBudget": 4000
+      }
+    },
+    {
+      "name": "list_balance_transactions",
+      "description": "List balance transactions (payouts, charges, refunds) in chronological order.",
+      "method": "GET",
+      "path": "/balance_transactions",
+      "queryMap": {
+        "txn_type": "type",
+        "max_results": "limit",
+        "start_after": "starting_after"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "amount",
+          "currency",
+          "type",
+          "description",
+          "status",
+          "available_on",
+          "created"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "txn_type": {
+            "type": "string",
+            "enum": [
+              "charge",
+              "refund",
+              "payout",
+              "transfer",
+              "adjustment"
+            ],
+            "description": "Filter by transaction type"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          },
+          "start_after": {
+            "type": "string",
+            "description": "Cursor for pagination (balance transaction ID)"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_events",
+      "description": "List Stripe events (webhook log) with optional type filter.",
+      "method": "GET",
+      "path": "/events",
+      "queryMap": {
+        "event_type": "type",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "id",
+          "type",
+          "created",
+          "livemode",
+          "pending_webhooks"
+        ],
+        "limit": 25,
+        "summary": true,
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "description": "Filter by event type (e.g. customer.created, invoice.paid)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max results (1-100)"
+          }
+        }
+      }
+    }
+  ]
+}

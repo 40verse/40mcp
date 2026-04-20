@@ -1,0 +1,130 @@
+{
+  "name": "40mcp",
+  "version": "0.1.1-beta.0",
+  "description": "The universal API-to-MCP bridge. Any API. Any protocol. Token-aware.",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./loaders": {
+      "types": "./src/loaders/index.d.ts",
+      "default": "./src/loaders/index.js"
+    },
+    "./compose": {
+      "types": "./src/compose/index.d.ts",
+      "default": "./src/compose/index.js"
+    },
+    "./transport": {
+      "types": "./src/transport/index.d.ts",
+      "default": "./src/transport/index.js"
+    },
+    "./reverse": {
+      "types": "./src/reverse/server.d.ts",
+      "default": "./src/reverse/server.js"
+    },
+    "./transforms": {
+      "types": "./src/transforms/response.d.ts",
+      "default": "./src/transforms/response.js"
+    },
+    "./webhook": {
+      "types": "./src/webhook/listener.d.ts",
+      "default": "./src/webhook/listener.js"
+    },
+    "./tenant": {
+      "types": "./src/tenant/scope.d.ts",
+      "default": "./src/tenant/scope.js"
+    },
+    "./security": {
+      "types": "./src/security/vault.d.ts",
+      "default": "./src/security/vault.js"
+    },
+    "./policy": {
+      "types": "./src/security/policy.d.ts",
+      "default": "./src/security/policy.js"
+    },
+    "./steering": {
+      "types": "./src/steering/index.d.ts",
+      "default": "./src/steering/index.js"
+    }
+  },
+  "bin": {
+    "40mcp": "src/cli.js"
+  },
+  "files": [
+    "src/",
+    "!src/**/*.test.js",
+    "!src/red-team/",
+    "README.md",
+    "LICENSE",
+    "SPEC.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "CONCEPT.md",
+    "CONTRIBUTING.md",
+    "AGENTS.md",
+    "API.md",
+    "TROUBLESHOOTING.md",
+    "configs/",
+    "docs/"
+  ],
+  "scripts": {
+    "pretest": "node scripts/run-tests.mjs --ensure-node-modules",
+    "test": "node scripts/run-tests.mjs --root src",
+    "test:invariants": "node scripts/run-tests.mjs --root src/security/invariants",
+    "check:loc": "node scripts/check-loc.js",
+    "test:integration": "node scripts/run-tests.mjs --root test",
+    "test:all": "node scripts/run-tests.mjs --roots src,test",
+    "trust-matrix": "node scripts/trust-matrix.mjs",
+    "trust-demos": "node examples/run-trust-demos.mjs",
+    "lint": "eslint src test examples",
+    "lint:fix": "eslint src test examples --fix",
+    "verify": "npm run lint && npm run test:all && npm pack --dry-run",
+    "smoke-test": "bash scripts/smoke-test.sh",
+    "ci": "bash scripts/pre-commit.sh",
+    "ci:fast": "bash scripts/pre-commit.sh --fast",
+    "prepublishOnly": "npm run verify",
+    "example": "node examples/petstore.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "rest",
+    "api",
+    "graphql",
+    "openapi",
+    "bridge",
+    "shim",
+    "claude",
+    "cursor",
+    "ai",
+    "tools",
+    "agent",
+    "token-aware"
+  ],
+  "license": "MIT",
+  "author": "40verse",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/40verse/40mcp.git"
+  },
+  "homepage": "https://github.com/40verse/40mcp#readme",
+  "bugs": {
+    "url": "https://github.com/40verse/40mcp/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@emulators/github": "^0.4.1",
+    "@types/node": "^20.0.0",
+    "emulate": "^0.4.1",
+    "eslint": "^10.2.0"
+  }
+}
