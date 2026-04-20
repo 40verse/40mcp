@@ -134,9 +134,20 @@ test('Vector 1.4: Content-Length header lying (says 100, sends 10MB) should be r
       // Server should reject or timeout (not crash)
       assert.ok([400, 408, 500].includes(response.status), `Expected error, got ${response.status}`);
     } catch (err) {
-      // Timeout or connection reset is acceptable
-      assert.ok(err.message.includes('timeout') || err.message.includes('socket') || err.name === 'AbortError',
-        `Got error: ${err.message}`);
+      // Connection rejection, timeout, or abort are all acceptable — the
+      // assertion is "server rejected, didn't crash/hang." Node 18's undici
+      // surfaces the rejection as a bare "fetch failed" with the transport
+      // error on err.cause; Node 20+ includes more detail in err.message.
+      // Accept any of these shapes.
+      const cause = err.cause ? String(err.cause.code || err.cause.message || err.cause) : '';
+      const matches =
+        err.message.includes('timeout') ||
+        err.message.includes('socket') ||
+        err.message.includes('fetch failed') ||
+        err.name === 'AbortError' ||
+        cause.includes('ECONNRESET') ||
+        cause.includes('UND_ERR');
+      assert.ok(matches, `Got error: ${err.message} (cause: ${cause})`);
     }
   } finally {
     httpServer.close();
