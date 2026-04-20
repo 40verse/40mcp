@@ -39,7 +39,7 @@ In the spirit of [SPEC.md §3](../SPEC.md):
 
 - **No agent runtime.** We do not embed or call an LLM.
 - **No UI resource scheme** (no `ui://`, no rendered artifacts). Tool outputs are data.
-- **No orchestration.** Multi-step workflows across services belong to 40link, not to a bridge.
+- **No orchestration.** This isnt a harness, its a tool for your harness.
 
 If those are things you need, FastMCP v3 (and its surrounding Python ecosystem) is a reasonable tool for the job. 40mcp is intentionally narrower.
 
