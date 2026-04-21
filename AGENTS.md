@@ -126,6 +126,64 @@ Security controls enforce boundaries between tiers. See [docs/trust-model.md](do
 
 Run `npm run check:loc` before submitting.
 
+## CI review
+
+### Job map
+
+| Job | Runs on | What it checks |
+|-----|---------|---------------|
+| `Lint + pack` | ubuntu / Node 22 | ESLint, LOC thresholds, `npm pack --dry-run` |
+| `Test (Node 18/20/22)` | ubuntu matrix | Full test suite across three LTS versions |
+| `Test (macOS, Node 22)` | macos-latest | Same suite, catches path/symlink divergence |
+| `Smoke (packaged install)` | ubuntu / Node 22 | Installs the packed tarball, runs `scripts/smoke-test.sh` |
+
+### Reproducing a failure locally
+
+```bash
+# Lint + pack
+npm run lint
+npm run check:loc
+npm pack --dry-run --ignore-scripts
+
+# Tests (pick version via nvm/fnm if needed)
+npm run test:all          # all unit + integration
+npm run test:invariants   # security invariants only — run after any security-critical edit
+
+# Smoke
+bash scripts/smoke-test.sh
+```
+
+### Triage guide
+
+**Lint failure** — auto-fixable. Run `npm run lint:fix`, review the diff, commit.
+
+**LOC threshold exceeded** — not auto-fixable. The file needs splitting or the threshold needs a deliberate raise in `scripts/check-loc.js`. Do not raise thresholds without a justification comment.
+
+**Test failure on Node 18 only** — likely a Node 18 incompatibility: no `fetch` globals (use `http`/`https` or pass explicit IPv4 URLs), no `structuredClone`, no `ReadableStream` web API. Check `scripts/run-tests.mjs` for version guards.
+
+**Test failure on macOS only** — usually a path issue. `/tmp` and `/var` are symlinks to `/private/tmp` and `/private/var` on macOS. Use `fs.realpathSync` or `path.resolve` before comparing paths.
+
+**Smoke failure** — the packaged tarball is broken. Check that the `files` field in `package.json` includes everything the CLI needs at runtime, and that no runtime import resolves to a path excluded by the tarball.
+
+**Security invariant failure** — do not auto-fix without reading the invariant. These tests encode trust-boundary contracts. A failing invariant means a documented security control is no longer holding. Apply the release gate decision tree from `docs/RELEASE_GATE.md` before touching the code.
+
+**Trust matrix failure** (`npm run trust-matrix`) — automatic release blocker. All 11 scenarios must pass. Do not mark a PR ready while any trust matrix scenario fails.
+
+### What an agent can fix autonomously
+
+- Lint errors (`npm run lint:fix` + manual cleanup)
+- Failing unit tests caused by a logic regression in non-security code
+- Node version compatibility issues (fetch URLs, built-in API availability)
+- macOS path canonicalization failures
+
+### What requires human sign-off
+
+- Any change to `src/security/`, `src/core/env.js`, `src/core/sanitize.js`, or `src/core/object.js`
+- Raising a LOC hard limit
+- A failing security invariant or trust matrix scenario
+- Adding or removing files from the `files` field in `package.json`
+- Any new runtime dependency (the answer is almost always no — see architecture rule #1)
+
 ## PR checklist
 
 - [ ] `npm run lint` passes
