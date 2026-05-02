@@ -736,7 +736,7 @@ describe('redirect security', () => {
   it('resolves relative Location on second hop against first hop URL, not original URL', async () => {
     const fetchCalls = [];
 
-    globalThis.fetch = async (url, init) => {
+    globalThis.fetch = async (url, _init) => {
       fetchCalls.push(url);
 
       if (url === 'https://api.example.com/start') {
