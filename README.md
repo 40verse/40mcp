@@ -268,6 +268,8 @@ Connect to existing MCP servers and re-expose their tools with 40mcp's features 
   --require-bearer-env FRONTDOOR_TOKEN
 ```
 
+> **Note:** `link --sse` supports multiple concurrent clients; `serve --sse` is single-session only (second clients get "Already connected to a transport"). See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#already-connected-to-a-transport-single-session-sse-on-serve) for workarounds.
+
 ```js
 import { connectStdio, connectFromConfig } from '40mcp';
 
