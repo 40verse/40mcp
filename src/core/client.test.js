@@ -781,4 +781,72 @@ describe('redirect security', () => {
       `Third fetch must resolve relative Location against hop-1 URL. Got: ${fetchCalls[2]}`,
     );
   });
+
+  // Issue #17 follow-up (PR #37 review): once a credential header has been
+  // stripped due to a cross-origin redirect, it must NOT be reintroduced by a
+  // subsequent same-origin redirect. Otherwise multi-hop chains can resurrect
+  // Authorization on the 2nd foreign hop, defeating the strip.
+  it('does not reintroduce stripped credentials on subsequent same-origin hops', async () => {
+    const fetchCalls = [];
+
+    globalThis.fetch = async (url, init) => {
+      fetchCalls.push({ url, headers: { ...(init?.headers || {}) } });
+
+      if (url === 'https://api.example.com/start') {
+        // Hop 0 (initial) → cross-origin redirect to cdn.example.com
+        return {
+          type: 'basic',
+          status: 302,
+          headers: {
+            get: (name) => name === 'location' ? 'https://cdn.example.com/intermediate' : null,
+          },
+        };
+      }
+      if (url === 'https://cdn.example.com/intermediate') {
+        // Hop 1 → SAME-ORIGIN redirect, still on cdn.example.com.
+        // The bug: this hop would re-include Authorization because the
+        // strip branch only fires when sameOrigin is false.
+        return {
+          type: 'basic',
+          status: 302,
+          headers: {
+            get: (name) => name === 'location' ? 'https://cdn.example.com/final' : null,
+          },
+        };
+      }
+      // Final destination
+      return { ok: true, status: 200, text: async () => '{"arrived":true}' };
+    };
+
+    const client = createApiClient('https://api.example.com', {
+      type: 'bearer',
+      value: 'super-secret-token',
+    }, { allowPrivateRedirect: true });
+
+    await client('GET', '/start');
+
+    assert.ok(fetchCalls.length >= 3, `Expected 3 fetch calls, got ${fetchCalls.length}`);
+
+    // Hop 0 to api.example.com — Authorization MUST be present (origin matches).
+    const hop0 = fetchCalls[0].headers;
+    assert.ok(
+      Object.keys(hop0).some(k => k.toLowerCase() === 'authorization'),
+      `Hop 0 (api.example.com) must carry Authorization. Got: ${JSON.stringify(Object.keys(hop0))}`,
+    );
+
+    // Hop 1 to cdn.example.com — Authorization MUST be stripped (cross-origin).
+    const hop1 = fetchCalls[1].headers;
+    assert.ok(
+      !Object.keys(hop1).some(k => k.toLowerCase() === 'authorization'),
+      `Hop 1 (cdn.example.com, cross-origin) must NOT carry Authorization. Got: ${JSON.stringify(Object.keys(hop1))}`,
+    );
+
+    // Hop 2 to cdn.example.com/final — same-origin to hop 1, but credential
+    // was already stripped at the trust boundary and MUST stay stripped.
+    const hop2 = fetchCalls[2].headers;
+    assert.ok(
+      !Object.keys(hop2).some(k => k.toLowerCase() === 'authorization'),
+      `Hop 2 (same-origin to hop 1) must NOT reintroduce Authorization. Got: ${JSON.stringify(Object.keys(hop2))}`,
+    );
+  });
 });
