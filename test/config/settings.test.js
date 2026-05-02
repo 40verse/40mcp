@@ -184,7 +184,7 @@ describe('validateSettings — frontdoor', () => {
         network: { allowedOrigins: ['https://example.com'] },
         limits: { sse: { maxConnections: 100, idleTimeoutMs: 60000 } },
         surface: { allowTools: ['a.*'], denyTools: ['b.*'], healthDetail: true },
-        policy: { path: '/etc/policy.json' },
+        policy: { path: 'configs/policy.json' },
         telemetry: { audit: false, events: true },
       },
     });
