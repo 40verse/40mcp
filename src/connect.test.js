@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { connectStdio, connectSse, connectMany, connectFromConfig, _sanitizeInputSchemaForTesting as sanitizeInputSchema } from './connect.js';
+import { connectStdio, connectSse, connectMany, connectFromConfig, _sanitizeInputSchemaForTesting as sanitizeInputSchema, _buildConnectedServerForTesting as buildConnectedServer } from './connect.js';
+import { MAX_JSON_PARSE_BYTES } from './connect-size.js';
 
 describe('connectStdio', () => {
   it('throws if command is missing', async () => {
@@ -214,5 +215,96 @@ describe('connectFromConfig', () => {
       { only: ['nonexistent'] }, // Filter out everything
     );
     assert.deepEqual(result.tools, []);
+  });
+});
+
+// ─── size-cap tests ────────────────────────────────────────────────────────
+
+// Helpers to build minimal mock clients for buildConnectedServer unit tests.
+function makeMockTransport() {
+  return { close: async () => {} };
+}
+
+function makeMockClient({ tools = [], callToolResult = null } = {}) {
+  return {
+    initializeResult: { protocolVersion: '2024-11-05' },
+    listTools: async () => ({ tools }),
+    callTool: async () => callToolResult ?? { content: [{ type: 'text', text: '{"ok":true}' }] },
+  };
+}
+
+describe('buildConnectedServer — listTools size cap', () => {
+  it('accepts a listTools response within the byte limit', async () => {
+    const client = makeMockClient({
+      tools: [{ name: 'small_tool', description: 'ok', inputSchema: { type: 'object', properties: {} } }],
+    });
+    const server = await buildConnectedServer(client, makeMockTransport(), { source: 'test-server' });
+    assert.ok(Array.isArray(server.tools));
+    assert.equal(server.tools.length, 1);
+    await server.close();
+  });
+
+  it('rejects a listTools response that exceeds the byte limit', async () => {
+    // Build a tools array whose JSON representation is > MAX_JSON_PARSE_BYTES.
+    // A single tool with a description padded to exceed the cap is sufficient.
+    const hugeDescription = 'x'.repeat(MAX_JSON_PARSE_BYTES + 1);
+    const client = makeMockClient({
+      tools: [{ name: 'big_tool', description: hugeDescription, inputSchema: { type: 'object', properties: {} } }],
+    });
+
+    await assert.rejects(
+      () => buildConnectedServer(client, makeMockTransport(), { source: 'evil-server' }),
+      (err) => {
+        assert.ok(err.message.includes('size limit'), `Expected size-limit message, got: ${err.message}`);
+        return true;
+      },
+    );
+  });
+});
+
+describe('buildConnectedServer — callTool oversized response', () => {
+  it('returns a structured error object (not raw string) when callTool response exceeds the byte limit', async () => {
+    const hugeText = 'y'.repeat(MAX_JSON_PARSE_BYTES + 1);
+    const client = makeMockClient({
+      tools: [{ name: 'streaming_tool', description: 'returns huge payload', inputSchema: { type: 'object', properties: {} } }],
+      callToolResult: { content: [{ type: 'text', text: hugeText }] },
+    });
+
+    const stderrLines = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (msg, ...rest) => { stderrLines.push(String(msg)); return origWrite(msg, ...rest); };
+
+    let result;
+    try {
+      const server = await buildConnectedServer(client, makeMockTransport(), { source: 'big-tool-server' });
+      result = await server.dispatch('streaming_tool', {});
+      await server.close();
+    } finally {
+      process.stderr.write = origWrite;
+    }
+
+    // Must be a structured error object, NOT the raw oversized string
+    assert.equal(typeof result, 'object', 'Result must be an object, not a raw string');
+    assert.notEqual(result, null);
+    assert.equal(result.error, 'upstream_response_too_large');
+    assert.ok(typeof result.message === 'string');
+
+    // Must have emitted a WARNING to stderr
+    const warned = stderrLines.some((l) => l.includes('WARNING') && (l.includes('exceeds') || l.includes('exceeded')));
+    assert.ok(warned, 'Expected a WARNING message on stderr for oversized response');
+  });
+
+  it('returns parsed JSON normally when callTool response is within the byte limit', async () => {
+    const client = makeMockClient({
+      tools: [{ name: 'normal_tool', description: 'normal', inputSchema: { type: 'object', properties: {} } }],
+      callToolResult: { content: [{ type: 'text', text: JSON.stringify({ answer: 42 }) }] },
+    });
+
+    const server = await buildConnectedServer(client, makeMockTransport(), { source: 'normal-server' });
+    const result = await server.dispatch('normal_tool', {});
+    await server.close();
+
+    assert.equal(typeof result, 'object');
+    assert.equal(result.answer, 42);
   });
 });
