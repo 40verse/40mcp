@@ -77,8 +77,6 @@ Basic OpenAPI → MCP converters exist and are fine for quick prototypes. 40mcp 
 
 **Rule of thumb:** Use a basic bridge for a single documented API in development. Use 40mcp when token efficiency matters, the API is undocumented, or you need security controls, policy gates, or composition.
 
-For a head-to-head comparison vs FastMCP specifically, see [docs/COMPARISON.md](docs/COMPARISON.md).
-
 ---
 
 ## Install
