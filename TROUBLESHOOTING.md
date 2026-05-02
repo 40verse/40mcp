@@ -605,6 +605,28 @@ curl http://localhost:3000/status
 client.close();
 ```
 
+### "Already connected to a transport" (single-session SSE on `serve`)
+
+**Symptom:** Second concurrent SSE client connection fails with `"Already connected to a transport"`.
+
+**Cause:** `cmdServe` uses one shared `Server` instance across SSE sessions; the MCP SDK's `Server.connect(transport)` rejects a second attachment while the first is active.
+
+**Workarounds:**
+
+1. **Use `link` instead of `serve`** — `cmdLink` mints a fresh `Server` per session:
+   ```bash
+   40mcp link .mcp.json --sse 8080 --host 0.0.0.0
+   ```
+
+2. **Front multiple `serve` instances behind a reverse proxy** — each `serve` process supports one active SSE session, so run at least one process per expected concurrent client and route clients across them:
+   ```bash
+   # Terminal 1
+   40mcp serve config.json --sse 3001
+   # Terminal 2
+   40mcp serve config.json --sse 3002
+   # Then use nginx/HAProxy to load-balance across both
+   ```
+
 ### Session Cleanup Issues
 
 **Symptom:** Memory usage grows; old sessions don't disconnect.
