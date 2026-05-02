@@ -377,6 +377,146 @@ describe('SSE transport — multi-token bearer auth', () => {
   });
 });
 
+describe('SSE transport — cross-principal session ownership', () => {
+  // Use a noop stub to support multiple concurrent sessions.
+  function createMultiSessionStub() {
+    return { connect: async () => {} };
+  }
+
+  it('POST /message returns 403 when bearer principal does not own the session', async () => {
+    // Configure two principals: alice and bob.
+    const server = createMultiSessionStub();
+    const { httpServer } = await createSseTransport(server, {
+      port: 0,
+      requireBearer: { alice: 'tok-a', bob: 'tok-b' },
+      maxSessionsPerIp: 100,
+    });
+
+    const ctls = [];
+    try {
+      const port = httpServer.address().port;
+
+      // Open a session as alice.
+      const aliceCtl = new AbortController();
+      ctls.push(aliceCtl);
+      const aliceRes = await fetch(`http://127.0.0.1:${port}/sse?sessionId=alice-sess`, {
+        headers: { Authorization: 'Bearer tok-a' },
+        signal: aliceCtl.signal,
+      });
+      assert.notEqual(aliceRes.status, 401, 'alice SSE connect should not 401');
+
+      // Read the initial SSE event to get the sessionId echoed back; we
+      // already know it's "alice-sess" since we supplied it explicitly.
+      // Give the handler a tick to register the session.
+      await new Promise((done) => setTimeout(done, 50));
+
+      // Bob tries to POST a message to alice's session — must be denied.
+      const crossRes = await fetch(
+        `http://127.0.0.1:${port}/message?sessionId=alice-sess`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer tok-b',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+        },
+      );
+      await crossRes.text().catch(() => {});
+      assert.equal(crossRes.status, 403, 'cross-principal POST should be denied with 403');
+    } finally {
+      for (const c of ctls) c.abort();
+      httpServer.close();
+    }
+  });
+
+  it('POST /message succeeds when bearer principal owns the session', async () => {
+    const server = createMultiSessionStub();
+    const { httpServer } = await createSseTransport(server, {
+      port: 0,
+      requireBearer: { alice: 'tok-a', bob: 'tok-b' },
+      maxSessionsPerIp: 100,
+    });
+
+    const ctls = [];
+    try {
+      const port = httpServer.address().port;
+
+      // Open alice's session.
+      const aliceCtl = new AbortController();
+      ctls.push(aliceCtl);
+      const aliceRes = await fetch(`http://127.0.0.1:${port}/sse?sessionId=alice-own`, {
+        headers: { Authorization: 'Bearer tok-a' },
+        signal: aliceCtl.signal,
+      });
+      assert.notEqual(aliceRes.status, 401, 'alice SSE connect should not 401');
+
+      await new Promise((done) => setTimeout(done, 50));
+
+      // Alice POSTs to her own session — must not get 403.
+      const ownRes = await fetch(
+        `http://127.0.0.1:${port}/message?sessionId=alice-own`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer tok-a',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+        },
+      );
+      await ownRes.text().catch(() => {});
+      assert.notEqual(ownRes.status, 403, 'same-principal POST must not be 403');
+    } finally {
+      for (const c of ctls) c.abort();
+      httpServer.close();
+    }
+  });
+
+  it('single-token mode allows any valid token to POST to any session', async () => {
+    // In single-token mode both postAuth.principal and _frontdoorPrincipal
+    // are null, so the ownership gate is a no-op — no 403 should fire.
+    const server = createMultiSessionStub();
+    const { httpServer } = await createSseTransport(server, {
+      port: 0,
+      requireBearer: 'shared-tok',
+      maxSessionsPerIp: 100,
+    });
+
+    const ctls = [];
+    try {
+      const port = httpServer.address().port;
+
+      const sessCtl = new AbortController();
+      ctls.push(sessCtl);
+      const sessRes = await fetch(`http://127.0.0.1:${port}/sse?sessionId=single-sess`, {
+        headers: { Authorization: 'Bearer shared-tok' },
+        signal: sessCtl.signal,
+      });
+      assert.notEqual(sessRes.status, 401, 'single-token SSE connect should not 401');
+
+      await new Promise((done) => setTimeout(done, 50));
+
+      const postRes = await fetch(
+        `http://127.0.0.1:${port}/message?sessionId=single-sess`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer shared-tok',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+        },
+      );
+      await postRes.text().catch(() => {});
+      assert.notEqual(postRes.status, 403, 'single-token mode must not 403');
+    } finally {
+      for (const c of ctls) c.abort();
+      httpServer.close();
+    }
+  });
+});
+
 describe('SSE transport — per-principal session cap', () => {
   // The real MCP SDK `Server` rejects a second `connect(transport)` call
   // — fine for production (one Server per process) but it makes
