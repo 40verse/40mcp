@@ -736,6 +736,9 @@ export { sanitizeSpawnEnv as _sanitizeSpawnEnvForTesting };
 // DNS rebinding guard — export the IP validation step for
 // invariant testing without requiring real DNS lookups.
 export { checkResolvedIp as _checkResolvedIpForTesting };
+// buildConnectedServer is exported for unit testing of size-cap logic
+// with mock clients; not part of the public API.
+export { buildConnectedServer as _buildConnectedServerForTesting };
 
 async function buildConnectedServer(client, transport, options) {
   const { prefix, allowlist, blocklist, transforms, policy, source } = options;
@@ -754,6 +757,19 @@ async function buildConnectedServer(client, transport, options) {
 
   // Discover tools from the upstream server
   const listResult = await client.listTools();
+
+  // Guard against memory exhaustion from oversized listTools responses.
+  // An attacker-controlled upstream could return a payload large enough to
+  // exhaust the JSON serialisation budget downstream. Reject before we do
+  // any further work with the result.
+  const listResultJson = JSON.stringify(listResult);
+  if (exceedsJsonParseByteLimit(listResultJson)) {
+    throw new BridgeError(
+      BridgeErrorCode.UPSTREAM_ERROR,
+      `listTools response from "${source}" exceeds the ${MAX_JSON_PARSE_BYTES}-byte size limit and was rejected`,
+    );
+  }
+
   const upstreamTools = listResult.tools || [];
 
   // H15 — validate tool names from upstream before registering them.
@@ -888,13 +904,19 @@ async function buildConnectedServer(client, transport, options) {
           const textContent = result.content.find((c) => c.type === 'text');
           if (textContent) {
             // Guard against memory exhaustion from oversized upstream responses.
-            // Strings larger than 10 MB are returned as-is rather than parsed.
+            // Strings larger than 10 MB are rejected: returning the raw string
+            // would allow callers (e.g. cli.js) to re-serialise it and double
+            // the allocation. Return a structured error object instead so the
+            // raw payload is never propagated further.
             if (exceedsJsonParseByteLimit(textContent.text)) {
               process.stderr.write(
-                `[40mcp] WARNING: upstream tool response exceeds ${MAX_JSON_PARSE_BYTES} bytes — ` +
-                `returning as raw string without JSON.parse\n`,
+                `[40mcp] WARNING: upstream tool response from "${safeLog(source, 128)}" exceeds ${MAX_JSON_PARSE_BYTES} bytes — ` +
+                `response dropped to prevent memory exhaustion\n`,
               );
-              data = textContent.text;
+              data = {
+                error: 'upstream_response_too_large',
+                message: `Tool response from "${source}" exceeded the ${MAX_JSON_PARSE_BYTES}-byte size limit and was dropped`,
+              };
             } else {
               try {
                 data = JSON.parse(textContent.text);
