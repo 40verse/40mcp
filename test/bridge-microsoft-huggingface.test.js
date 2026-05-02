@@ -392,8 +392,11 @@ describe('Live probe (skipped when offline): real remote MCP endpoints', () => {
         connected = await connectStreamableHttp({ url: target.url, prefix: target.prefix });
       } catch (err) {
         const msg = String(err?.message || err);
+        const code = err?.code;
         const networkBlocked =
-          /ENETUNREACH|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|fetch failed|403|tunnel|proxy|(?:SSE|Streamable HTTP) client transport not available/i.test(msg);
+          /ENETUNREACH|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|fetch failed|403|not in allowlist|tunnel|proxy|(?:SSE|Streamable HTTP) client transport not available/i.test(msg) ||
+          code === 403 ||
+          code === 'ENETUNREACH' || code === 'ECONNREFUSED' || code === 'EAI_AGAIN' || code === 'ENOTFOUND';
         if (networkBlocked) {
           process.stderr.write(`[live-probe] ${target.label}: skipped (offline / egress blocked): ${msg.split('\n')[0]}\n`);
           return;
