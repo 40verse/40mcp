@@ -541,8 +541,6 @@ Detailed setup for Claude Desktop, Cursor, VS Code, Claude Code, and SSE deploym
 - [docs/COMMANDS/settings-and-doctor.md](docs/COMMANDS/settings-and-doctor.md) — `settings show` and `doctor` scope
 - [docs/FRONTDOOR.md](docs/FRONTDOOR.md) — published SSE deployment patterns
 - [docs/TESTING.md](docs/TESTING.md) — operator testing strategy for bridges, frontdoors, tenants, and policy gates
-- [docs/COMPARISON.md](docs/COMPARISON.md) — 40mcp vs FastMCP capability matrix
-- [docs/MIGRATION_FROM_FASTMCP.md](docs/MIGRATION_FROM_FASTMCP.md) — FastMCP → 40mcp primitive mapping and divergences
 
 ## License
 
