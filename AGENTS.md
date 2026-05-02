@@ -16,7 +16,7 @@ src/
 ├── validate.js      Config validation
 ├── config/          Settings scaffold, show, and mutation helpers
 ├── core/            Client, path interpolation, env guards, types
-├── loaders/         OpenAPI, GraphQL, HAR, plugin registry
+├── loaders/         GraphQL, HAR, plugin registry
 ├── providers/       Provider-level OpenAPI loading
 ├── transforms/      Token-aware response shaping (pick, omit, limit, tokenBudget)
 ├── compose/         Chains (multi-step) + mixer (multi-server)

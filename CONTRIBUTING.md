@@ -60,7 +60,7 @@ src/
 ├── errors.js        Structured error taxonomy
 ├── validate.js      Config validation
 ├── core/            Client, path interpolation, types
-├── loaders/         OpenAPI, GraphQL, HAR, plugin registry
+├── loaders/         GraphQL, HAR, plugin registry
 ├── transforms/      Response shaping
 ├── compose/         Chains + mixer
 ├── transport/       Stdio + SSE
