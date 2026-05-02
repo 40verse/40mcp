@@ -618,7 +618,7 @@ client.close();
    40mcp link .mcp.json --sse 8080 --host 0.0.0.0
    ```
 
-2. **Front multiple `serve` instances behind a reverse proxy** — balance load across processes:
+2. **Front multiple `serve` instances behind a reverse proxy** — each `serve` process supports one active SSE session, so run at least one process per expected concurrent client and route clients across them:
    ```bash
    # Terminal 1
    40mcp serve config.json --sse 3001
