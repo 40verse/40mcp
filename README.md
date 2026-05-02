@@ -446,7 +446,7 @@ One dependency: `@modelcontextprotocol/sdk`. All other functionality uses Node b
 
 ## The Tesseract
 
-For the conceptual framing behind the D1–D4 architecture (why each dimension is a structural transformation, not a feature list), see [CONCEPT.md](CONCEPT.md).
+40mcp models its architecture as a tesseract — four nested dimensions where each folds the previous into itself. For the conceptual framing behind the D1–D4 architecture (why each dimension is a structural transformation, not a feature list), see [CONCEPT.md](CONCEPT.md).
 
 ## Local Development Without API Keys
 
