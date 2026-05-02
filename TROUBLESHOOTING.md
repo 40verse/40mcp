@@ -27,8 +27,8 @@ A comprehensive guide to diagnosing and fixing common issues with the 40mcp univ
 [[ -z "${API_KEY}" ]] && echo "NOT SET" || echo "SET (value hidden)"
 
 # Preferred: seal the key in the vault and reference it via seal:// ID
-node -e "
-  const { createVault } = require('40mcp');
+node --input-type=module -e "
+  import { createVault } from '40mcp';
   const vault = createVault({ path: '.vault.json', passphrase: process.env.VAULT_PASSPHRASE });
   vault.set('API_KEY', 'your-api-key').then(id => console.log('Sealed as:', id));
 "
@@ -101,8 +101,8 @@ ls -lh .vault.json
 
 # Check which vault path your bridge config is using
 # If vault file is missing, re-seal all secrets from your secure store
-node -e "
-  const { createVault } = require('40mcp');
+node --input-type=module -e "
+  import { createVault } from '40mcp';
   const vault = createVault({ path: '.vault.json', passphrase: process.env.VAULT_PASSPHRASE });
   vault.list().then(secrets => console.log(secrets.map(s => s.name)));
 "
@@ -672,8 +672,8 @@ jq 'del(.log.entries[].request.headers[] | select(.name | test("^[Aa]uthorizatio
 # Step 2: Seal the real credentials in the vault
 # Note: VAULT_PASSPHRASE via env var is local/dev only.
 # In production, use the vault daemon instead (40mcp vault daemon start).
-node -e "
-  const { createVault } = require('40mcp');
+node --input-type=module -e "
+  import { createVault } from '40mcp';
   const vault = createVault({ path: '.vault.json', passphrase: process.env.VAULT_PASSPHRASE });
   vault.set('GITHUB_TOKEN', process.env.GITHUB_TOKEN_PLAINTEXT)
     .then(id => console.log('Sealed:', id));
@@ -1088,8 +1088,8 @@ git push origin --force --all
 ```bash
 # Never put the new key in a file or env var directly
 # Seal it immediately
-node -e "
-  const { createVault } = require('40mcp');
+node --input-type=module -e "
+  import { createVault } from '40mcp';
   const vault = createVault({ path: '.vault.json', passphrase: process.env.VAULT_PASSPHRASE });
   vault.set('GITHUB_TOKEN', '<rotated-github-token>')
     .then(id => console.log('New seal ID:', id));
@@ -1115,8 +1115,8 @@ When an API key is compromised, expires, or is being cycled as a security practi
 
 ```bash
 # Step 1: Seal the new key alongside the old one (zero-downtime rotation)
-node -e "
-  const { createVault } = require('40mcp');
+node --input-type=module -e "
+  import { createVault } from '40mcp';
   const vault = createVault({ path: '.vault.json', passphrase: process.env.VAULT_PASSPHRASE });
   vault.set('GITHUB_TOKEN_V2', '<new-github-token>')
     .then(id => console.log('New seal ID:', id));
@@ -1126,8 +1126,8 @@ node -e "
 # No plaintext ever appears in the config file
 
 # Step 3: Remove the old key from the vault
-node -e "
-  const { createVault } = require('40mcp');
+node --input-type=module -e "
+  import { createVault } from '40mcp';
   const vault = createVault({ path: '.vault.json', passphrase: process.env.VAULT_PASSPHRASE });
   vault.delete('GITHUB_TOKEN').then(() => console.log('Old key deleted'));
 "
