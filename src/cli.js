@@ -14,7 +14,7 @@
  * 40mcp inspect config.json # List tools without starting
  */
 
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, access, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { homedir, platform } from 'node:os';
@@ -37,6 +37,9 @@ import { generateFromSpec, generatePrompt } from './generate.js';
 import { connectStdio, connectFromConfig } from './connect.js';
 import { loadSettings, pick, parseByteSize } from './config/settings.js';
 import { setTelemetryConfig, setInstanceMetadata, instanceBannerSuffix } from './core/events.js';
+
+/** Hard ceiling for frontdoor JSON file size. Mirrors MAX_CONFIG_FILE_BYTES in config.js. */
+const MAX_FRONTDOOR_FILE_BYTES = 16 * 1024 * 1024;
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -983,6 +986,15 @@ function positionalArgs(args) {
 async function loadFrontdoorJson(flagValue, flagName) {
  if (flagValue === undefined || flagValue === false) return null;
  const filePath = resolve(process.cwd(), String(flagValue));
+ let st;
+ try {
+ st = await stat(filePath);
+ } catch (err) {
+ fatal(`${flagName} ${filePath}: ${err.message}`);
+ }
+ if (st.size > MAX_FRONTDOOR_FILE_BYTES) {
+ fatal(`${flagName} ${filePath}: file too large (${st.size} > ${MAX_FRONTDOOR_FILE_BYTES} bytes).`);
+ }
  let raw;
  try {
  raw = await readFile(filePath, 'utf-8');
