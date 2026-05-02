@@ -288,4 +288,136 @@ describe('generateFromSpec', () => {
     assert.ok(config.tools.some((t) => t.name.includes('list')));
     assert.ok(config.tools.some((t) => t.name.includes('get')));
   });
+
+  it('blocks SSRF — loopback server URL throws', () => {
+    const spec = {
+      openapi: '3.0.0',
+      info: { title: 'Evil API', version: '1.0' },
+      servers: [{ url: 'http://127.0.0.1/internal' }],
+      paths: {},
+    };
+    assert.throws(
+      () => generateFromSpec(spec),
+      /loopback|127/i,
+    );
+  });
+
+  it('blocks SSRF — cloud metadata server URL throws', () => {
+    const spec = {
+      openapi: '3.0.0',
+      info: { title: 'Evil API', version: '1.0' },
+      servers: [{ url: 'http://169.254.169.254/latest/meta-data' }],
+      paths: {},
+    };
+    assert.throws(
+      () => generateFromSpec(spec),
+      /cloud metadata|169\.254/i,
+    );
+  });
+
+  it('allows private URLs when allowPrivate:true', () => {
+    const spec = {
+      openapi: '3.0.0',
+      info: { title: 'Internal API', version: '1.0' },
+      servers: [{ url: 'http://192.168.1.10/api' }],
+      paths: {},
+    };
+    // Should not throw with allowPrivate:true
+    const config = generateFromSpec(spec, { allowPrivate: true });
+    assert.equal(config.baseUrl, 'http://192.168.1.10/api');
+  });
+
+  it('blocks prototype pollution — __proto__ parameter name is dropped', () => {
+    const spec = {
+      openapi: '3.0.0',
+      info: { title: 'Test API', version: '1.0' },
+      servers: [{ url: 'https://api.example.com' }],
+      paths: {
+        '/items': {
+          get: {
+            operationId: 'listItems',
+            summary: 'List items',
+            parameters: [
+              { name: '__proto__', in: 'query', schema: { type: 'string' } },
+              { name: 'limit', in: 'query', schema: { type: 'integer' } },
+            ],
+            responses: { 200: { description: 'OK' } },
+          },
+        },
+      },
+    };
+    const config = generateFromSpec(spec);
+    const tool = config.tools.find((t) => t.name === 'list_items');
+    assert.ok(tool, 'list_items tool should exist');
+    // __proto__ should be dropped — must not appear as a property
+    assert.ok(!Object.prototype.hasOwnProperty.call(tool.inputSchema.properties, '__proto__'),
+      '__proto__ key must not appear in properties');
+    // legitimate param should still be present
+    assert.ok(Object.prototype.hasOwnProperty.call(tool.inputSchema.properties, 'limit'),
+      'limit param should survive');
+    // properties should have a null prototype (no inherited keys)
+    assert.equal(Object.getPrototypeOf(tool.inputSchema.properties), null,
+      'properties object must have null prototype');
+  });
+
+  it('blocks prototype pollution — constructor body field is dropped', () => {
+    const spec = {
+      openapi: '3.0.0',
+      info: { title: 'Test API', version: '1.0' },
+      servers: [{ url: 'https://api.example.com' }],
+      paths: {
+        '/items': {
+          post: {
+            operationId: 'createItem',
+            summary: 'Create item',
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      constructor: { type: 'string' },
+                      name: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+            responses: { 201: { description: 'Created' } },
+          },
+        },
+      },
+    };
+    const config = generateFromSpec(spec);
+    const tool = config.tools.find((t) => t.name === 'create_item');
+    assert.ok(tool, 'create_item tool should exist');
+    assert.ok(!Object.prototype.hasOwnProperty.call(tool.inputSchema.properties, 'constructor'),
+      'constructor key must not appear in properties');
+    assert.ok(Object.prototype.hasOwnProperty.call(tool.inputSchema.properties, 'name'),
+      'name field should survive');
+  });
+
+  it('strips CRLF from apiKey header name', () => {
+    const spec = {
+      openapi: '3.0.0',
+      info: { title: 'Injection API', version: '1.0' },
+      servers: [{ url: 'https://api.example.com' }],
+      paths: {},
+      components: {
+        securitySchemes: {
+          apiKey: {
+            type: 'apiKey',
+            name: 'X-API-Key\r\nInjected-Header: evil',
+            in: 'header',
+          },
+        },
+      },
+    };
+    const config = generateFromSpec(spec);
+    assert.ok(config.auth, 'auth should be set');
+    assert.equal(config.auth.type, 'header');
+    assert.ok(!config.auth.header.includes('\r'), 'CR must be stripped from header name');
+    assert.ok(!config.auth.header.includes('\n'), 'LF must be stripped from header name');
+    assert.equal(config.auth.header, 'X-API-KeyInjected-Header: evil');
+  });
 });
