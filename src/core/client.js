@@ -486,6 +486,9 @@ export function createApiClient(baseUrl, authConfig, hooks) {
     }
 
     let response;
+    // Track the URL of the most-recently-fetched hop so that relative
+    // Location headers on subsequent hops resolve correctly (issue #20).
+    let currentUrl = url;
     try {
       response = await fetch(url, init);
       // Manual redirect loop — bounded at 5 hops.
@@ -519,7 +522,10 @@ export function createApiClient(baseUrl, authConfig, hooks) {
         }
         let nextUrl;
         try {
-          nextUrl = new URL(loc, url).toString();
+          // Resolve against currentUrl (the previous hop's URL) so that
+          // relative Location headers on multi-hop chains work correctly
+          // instead of always resolving against the original request URL (#20).
+          nextUrl = new URL(loc, currentUrl).toString();
         } catch {
           throw new ApiError(
             BridgeErrorCode.API_NETWORK,
@@ -559,6 +565,24 @@ export function createApiClient(baseUrl, authConfig, hooks) {
           redirectInit.method = 'GET';
           delete redirectInit.body;
         }
+        // Strip credential headers on cross-origin redirects (issue #17).
+        // Browsers do this per the Fetch spec; Node's fetch does not.
+        const sameOrigin = (() => {
+          try { return new URL(nextUrl).origin === new URL(currentUrl).origin; }
+          catch { return false; }
+        })();
+        if (!sameOrigin) {
+          redirectInit.headers = { ...(init.headers || {}) };
+          for (const k of Object.keys(redirectInit.headers)) {
+            const lk = k.toLowerCase();
+            if (lk === 'authorization' || lk === 'cookie' || lk === 'proxy-authorization') {
+              delete redirectInit.headers[k];
+            }
+          }
+        }
+        // Update currentUrl before fetching the next hop so that the next
+        // iteration resolves relative Locations correctly (#20).
+        currentUrl = nextUrl;
         response = await fetch(nextUrl, redirectInit);
       }
     } catch (err) {
