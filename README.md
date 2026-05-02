@@ -12,6 +12,25 @@ A [40verse](https://github.com/40verse) project.
 
 ---
 
+## Why 40mcp over basic OpenAPI bridges?
+
+Basic OpenAPI → MCP converters exist and are fine for quick prototypes. 40mcp is the choice when you need advanced features:
+
+| Capability | Basic bridges | 40mcp |
+|-----------|--------------|-------|
+| Token-aware response shaping | No | Yes — `tokenBudget`, `pick`, `omit`, `limit` |
+| Compound tool chains | No | Yes — multi-step sequences as single tools |
+| Undocumented API discovery | No | Yes — HAR loader reverse-engineers from traffic |
+| Sealed credential vault | No | Yes — AES-256-GCM, zero-plaintext, JIT tokens |
+| Human-in-the-loop policy gates | No | Yes — per-tool approval before dispatch |
+| Self-referential API archaeology | No | Yes — reverse bridge → HAR → reload → new bridge |
+| Multi-tenant auth isolation | No | Yes — per-call auth context, allowlist/blocklist |
+| Security controls | Varies | Yes — prototype-safe, SSRF-blocked, injection-hardened, input-validated (see [SAFE-DEFAULTS.md](docs/SAFE-DEFAULTS.md)) |
+
+**Rule of thumb:** Use a basic bridge for a single documented API in development. Use 40mcp when token efficiency matters, the API is undocumented, or you need security controls, policy gates, or composition.
+
+---
+
 ## 60-second golden path
 
 One command. No API keys. Two real public MCP upstreams. Proof 40mcp works before you commit to anything:
@@ -57,25 +76,6 @@ Both upstream configs are public, require no credentials, and stay inside the MC
 - **Give it a real API.** [Serve a community config →](#from-a-community-config) — GitHub, Stripe, Slack, Linear, and 25+ more live under [`configs/`](configs/).
 - **Publish it.** [Deploy a single authenticated frontdoor over SSE →](docs/FRONTDOOR.md) for remote MCP clients (GPT Actions, claude.ai, Cursor).
 - **Learn the mental model.** [Bridge vs frontdoor →](docs/BRIDGE_VS_FRONTDOOR.md) — `serve` exposes one API; `link` fronts many.
-
----
-
-## Why 40mcp over basic OpenAPI bridges?
-
-Basic OpenAPI → MCP converters exist and are fine for quick prototypes. 40mcp is the choice when you need advanced features:
-
-| Capability | Basic bridges | 40mcp |
-|-----------|--------------|-------|
-| Token-aware response shaping | No | Yes — `tokenBudget`, `pick`, `omit`, `limit` |
-| Compound tool chains | No | Yes — multi-step sequences as single tools |
-| Undocumented API discovery | No | Yes — HAR loader reverse-engineers from traffic |
-| Sealed credential vault | No | Yes — AES-256-GCM, zero-plaintext, JIT tokens |
-| Human-in-the-loop policy gates | No | Yes — per-tool approval before dispatch |
-| Self-referential API archaeology | No | Yes — reverse bridge → HAR → reload → new bridge |
-| Multi-tenant auth isolation | No | Yes — per-call auth context, allowlist/blocklist |
-| Security controls | Varies | Yes — prototype-safe, SSRF-blocked, injection-hardened, input-validated (see [SAFE-DEFAULTS.md](docs/SAFE-DEFAULTS.md)) |
-
-**Rule of thumb:** Use a basic bridge for a single documented API in development. Use 40mcp when token efficiency matters, the API is undocumented, or you need security controls, policy gates, or composition.
 
 ---
 
@@ -448,29 +448,7 @@ One dependency: `@modelcontextprotocol/sdk`. All other functionality uses Node b
 
 ## The Tesseract
 
-40mcp builds through four dimensions, where each folds the previous into itself:
-
-```
-D1: REST Bridge        D2: Loaders           D3: Composition       D4: Self-Reference
-   *------*            ==========            +---------+           +---------+
-                       ==========            | Mixer   |          /| Reverse/|
-  REST API             OpenAPI               | Chain   |         +---------+ |
-     |                 GraphQL               | Shape   |         | Bridge  | |
-  MCP Tools            HAR replay            +---------+         | wraps   |/
-                          |                      |               +-itself--+
-                       MCP Tools             MCP Tools                |
-                                                                 loop
-```
-
-**D1 -- The Line.** One REST API becomes MCP tools.
-
-**D2 -- The Plane.** Multiple protocols (OpenAPI, GraphQL, HAR, plugins) converge onto one tool surface.
-
-**D3 -- The Cube.** Tools interact. Mixer combines APIs. Chains compose multi-step operations. Transforms shape output.
-
-**D4 -- The Tesseract.** Reverse Bridge inverts direction — MCP tools become REST endpoints. Then: reverse bridge → HAR capture → HAR loader → new bridge. **40mcp wraps itself.**
-
-**Deep dive:** [CONCEPT.md](CONCEPT.md) — why each dimension is a structural transformation, not a feature list.
+40mcp models its architecture as a tesseract — four nested dimensions where each folds the previous into itself. For the conceptual framing behind the D1–D4 architecture (why each dimension is a structural transformation, not a feature list), see [CONCEPT.md](CONCEPT.md).
 
 ## Local Development Without API Keys
 
