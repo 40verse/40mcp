@@ -100,6 +100,82 @@ describe('createWebhookListener', () => {
       (err) => err.message.includes('requires a tool name'),
     );
   });
+
+  // ─── A01: non-loopback host without secret is a hard error ───────────────
+
+  it('throws when a route has no secret and host is 0.0.0.0', () => {
+    assert.throws(
+      () => createWebhookListener({
+        dispatch: async () => {},
+        host: '0.0.0.0',
+        routes: [{ path: '/hook', tool: 'test' }],
+      }),
+      (err) => err.message.includes('no secret') || err.message.includes('Set route.secret'),
+    );
+  });
+
+  it('throws when a route has no secret and host is a non-loopback IP', () => {
+    assert.throws(
+      () => createWebhookListener({
+        dispatch: async () => {},
+        host: '10.0.0.1',
+        routes: [{ path: '/hook', tool: 'test' }],
+      }),
+      (err) => err.message.includes('Set route.secret'),
+    );
+  });
+
+  it('does NOT throw when a route has no secret and host is 127.0.0.1 (loopback)', () => {
+    const stderrLines = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (msg, ...rest) => { stderrLines.push(String(msg)); return origWrite(msg, ...rest); };
+    try {
+      assert.doesNotThrow(
+        () => createWebhookListener({
+          dispatch: async () => {},
+          host: '127.0.0.1',
+          routes: [{ path: '/hook', tool: 'test' }],
+        }),
+      );
+      // A warning must be emitted for the unauthenticated loopback route
+      assert.ok(
+        stderrLines.some((l) => l.includes('WARNING') && l.includes('no secret')),
+        'Expected a WARNING stderr line about the missing secret',
+      );
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  });
+
+  it('does NOT throw when a route has no secret and host is localhost (loopback)', () => {
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (msg, ...rest) => origWrite(msg, ...rest);
+    try {
+      assert.doesNotThrow(
+        () => createWebhookListener({
+          dispatch: async () => {},
+          host: 'localhost',
+          routes: [{ path: '/hook', tool: 'test' }],
+        }),
+      );
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  });
+
+  it('does NOT throw when a route HAS a secret and host is 0.0.0.0', () => {
+    assert.doesNotThrow(
+      () => createWebhookListener({
+        dispatch: async () => {},
+        host: '0.0.0.0',
+        routes: [{
+          path: '/hook',
+          tool: 'test',
+          secret: { type: 'header', envVar: '__TEST_WEBHOOK_SECRET' },
+        }],
+      }),
+    );
+  });
 });
 
 describe('webhook HTTP server', () => {
@@ -475,6 +551,69 @@ describe('webhook HTTP server', () => {
   });
 
   // ─── Async error rate limiter tests ──────────────────────────────────
+
+  // ─── 202 recon-reduction: tool field is omitted on no-secret routes ─────
+
+  it('202 response omits tool name on loopback routes without a secret', async () => {
+    const dispatch = createMockDispatch();
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (msg, ...rest) => origWrite(msg, ...rest); // suppress warning noise in test output
+
+    try {
+      const listener = createWebhookListener({
+        dispatch,
+        port: 0,
+        host: '127.0.0.1',
+        routes: [{ path: '/hooks/test', tool: 'my_tool' }],
+      });
+      const { httpServer, url } = await listener.start();
+
+      try {
+        const res = await sendRequest(url, '/hooks/test', { body: { event: 'push' } });
+        assert.equal(res.status, 202);
+        const body = await res.json();
+        assert.equal(body.status, 'accepted');
+        assert.equal(body.tool, undefined, '202 must not echo tool name on no-secret routes (recon reduction)');
+      } finally {
+        httpServer.close();
+      }
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  });
+
+  it('202 response includes tool name on routes with a secret', async () => {
+    const dispatch = createMockDispatch();
+    process.env.__TEST_WEBHOOK_SECRET202 = 'secret-for-202-test';
+
+    try {
+      const listener = createWebhookListener({
+        dispatch,
+        port: 0,
+        routes: [{
+          path: '/hooks/test',
+          tool: 'my_tool',
+          secret: { type: 'header', header: 'x-webhook-secret', envVar: '__TEST_WEBHOOK_SECRET202' },
+        }],
+      });
+      const { httpServer, url } = await listener.start();
+
+      try {
+        const res = await sendRequest(url, '/hooks/test', {
+          body: {},
+          headers: { 'x-webhook-secret': 'secret-for-202-test' },
+        });
+        assert.equal(res.status, 202);
+        const body = await res.json();
+        assert.equal(body.status, 'accepted');
+        assert.equal(body.tool, 'my_tool', '202 must include tool name when route has a secret');
+      } finally {
+        httpServer.close();
+      }
+    } finally {
+      delete process.env.__TEST_WEBHOOK_SECRET202;
+    }
+  });
 
   it('suppresses repeated async dispatch errors after rate limit is reached', async () => {
     let dispatchCallCount = 0;
