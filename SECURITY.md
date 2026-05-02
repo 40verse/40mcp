@@ -127,7 +127,7 @@ The reverse bridge (`createReverseBridge`) validates incoming auth headers using
 - 40mcp does not prevent prompt injection by upstream APIs into LLM responses — it controls what reaches the LLM tool call boundary, not what the LLM does with the response.
 - 40mcp's security invariants cover documented code paths. Operator-provided middleware, custom plugins, or extensions are outside this scope.
 
-See [SPEC.md §7](SPEC.md#7-security-model) for the full security model, [docs/SAFE-DEFAULTS.md](docs/SAFE-DEFAULTS.md) for the deployment checklist, [docs/trust-model.md](docs/trust-model.md) for the three-tier trust topology, and [docs/security-evolution.md](docs/security-evolution.md) for the design history behind these controls.
+See [SPEC.md §7](SPEC.md#7-security-model) for the full security model, [docs/SAFE-DEFAULTS.md](docs/SAFE-DEFAULTS.md) for the deployment checklist, [docs/TRUST_MODEL.md](docs/TRUST_MODEL.md) for the three-tier trust topology, and [docs/SECURITY_EVOLUTION.md](docs/SECURITY_EVOLUTION.md) for the design history behind these controls.
 
 ## Security Contacts
 
