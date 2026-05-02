@@ -10,6 +10,9 @@
 
 import { validateConfig } from './validate.js';
 import { toSnakeCase } from './core/path.js';
+import { assertSafeUrl } from './core/env.js';
+import { sanitizeDescription } from './core/sanitize.js';
+import { DANGEROUS_KEYS } from './core/object.js';
 
 /**
  * The system prompt that teaches an LLM how to generate 40mcp configs.
@@ -221,6 +224,18 @@ export function generateFromSpec(spec, options = {}) {
   const info = spec.info || {};
   const servers = spec.servers || [];
   const baseUrl = servers[0]?.url || '';
+
+  // SSRF guard: validate spec-derived base URL against the same policy used by
+  // openapi.js. A spec with servers[0].url = "http://169.254.169.254/..." would
+  // otherwise cause every dispatched tool call to hit cloud metadata or other
+  // internal infrastructure. Only validate when the spec actually supplies a URL.
+  if (baseUrl) {
+    assertSafeUrl(baseUrl, {
+      allowPrivate: options.allowPrivate === true,
+      label: 'generateFromSpec server url',
+    });
+  }
+
   const paths = spec.paths || {};
 
   const tools = [];
@@ -235,10 +250,19 @@ export function generateFromSpec(spec, options = {}) {
 
       const tool = {
         name,
-        description: operation.summary || operation.description || `${httpMethod} ${pathTemplate}`,
+        // Sanitize description: spec-supplied summary/description fields flow into
+        // the LLM tool list verbatim. Run through the prompt-injection scanner and
+        // replace matches with a neutral placeholder. Mirrors openapi.js:188-189.
+        description: sanitizeDescription(
+          operation.summary || operation.description || `${httpMethod} ${pathTemplate}`,
+          { label: 'generateFromSpec' },
+        ),
         method: httpMethod,
         path: pathTemplate.replace(/\{([^}]+)\}/g, ':$1'),
-        inputSchema: { type: 'object', properties: {}, required: [] },
+        // Use null-prototype object so spec-controlled parameter names (e.g.
+        // "__proto__", "constructor") cannot shadow Object.prototype keys.
+        // Mirrors openapi.js parametersToSchema (openapi.js:287).
+        inputSchema: { type: 'object', properties: Object.create(null), required: [] },
       };
 
       // Extract parameters
@@ -246,7 +270,16 @@ export function generateFromSpec(spec, options = {}) {
       const queryMap = {};
 
       for (const param of params) {
+        if (!param || !param.name) continue;
         const propName = toSnakeCase(param.name);
+        // Drop any parameter whose converted name collides with a reserved
+        // JS object key. Mirrors openapi.js parametersToSchema:300-305.
+        if (DANGEROUS_KEYS.has(propName)) {
+          process.stderr.write(
+            `[40mcp] generateFromSpec: dropped parameter "${param.name}" — reserved JS object key\n`,
+          );
+          continue;
+        }
         tool.inputSchema.properties[propName] = {
           type: param.schema?.type || 'string',
           description: param.description || param.name,
@@ -273,6 +306,13 @@ export function generateFromSpec(spec, options = {}) {
           const bodyMap = {};
           for (const [fieldName, fieldSchema] of Object.entries(content.schema.properties)) {
             const propName = toSnakeCase(fieldName);
+            // Drop reserved JS object keys. Mirrors openapi.js parametersToSchema:300-305.
+            if (DANGEROUS_KEYS.has(propName)) {
+              process.stderr.write(
+                `[40mcp] generateFromSpec: dropped body field "${fieldName}" — reserved JS object key\n`,
+              );
+              continue;
+            }
             tool.inputSchema.properties[propName] = {
               type: fieldSchema.type || 'string',
               description: fieldSchema.description || fieldName,
@@ -320,7 +360,13 @@ export function generateFromSpec(spec, options = {}) {
     if (firstScheme.type === 'http' && firstScheme.scheme === 'bearer') {
       auth = { type: 'bearer', envVar: `${toEnvVar(info.title || 'API')}_TOKEN` };
     } else if (firstScheme.type === 'apiKey') {
-      auth = { type: 'header', header: firstScheme.name || 'X-API-Key', envVar: `${toEnvVar(info.title || 'API')}_KEY` };
+      // Strip CRLF from spec-supplied header name to prevent HTTP response splitting.
+      // A spec with name: "X-API-Key\r\nInjected-Header: evil" would otherwise
+      // write a raw newline into the HTTP header on every outbound call.
+      const rawHeaderName = typeof firstScheme.name === 'string'
+        ? firstScheme.name.replace(/[\r\n]/g, '')
+        : 'X-API-Key';
+      auth = { type: 'header', header: rawHeaderName || 'X-API-Key', envVar: `${toEnvVar(info.title || 'API')}_KEY` };
     } else if (firstScheme.type === 'oauth2') {
       const flows = firstScheme.flows || {};
       const ccFlow = flows.clientCredentials || flows.application;
