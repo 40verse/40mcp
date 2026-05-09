@@ -585,3 +585,268 @@ describe('API client (created by createApiClient)', () => {
     assert.equal(capturedInit.body, JSON.stringify({ modified: true }));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Redirect security tests (issues #17 and #20)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('redirect security', () => {
+  // Issue #17: Authorization (and other credential headers) must be stripped
+  // when a redirect crosses origins, matching the browser Fetch spec behavior.
+  it('strips Authorization header on cross-origin 307 redirect', async () => {
+    const fetchCalls = [];
+
+    globalThis.fetch = async (url, init) => {
+      fetchCalls.push({ url, headers: { ...init.headers } });
+
+      if (url === 'https://api.example.com/resource') {
+        // First fetch: respond with a 307 redirect to a different origin
+        return {
+          type: 'basic',
+          status: 307,
+          headers: {
+            get: (name) => name === 'location' ? 'https://other.example.com/resource' : null,
+          },
+        };
+      }
+      // Second fetch (cross-origin target): return 200
+      return {
+        ok: true,
+        status: 200,
+        text: async () => '{"ok":true}',
+      };
+    };
+
+    process.env.TEST_AUTH_TOKEN = 'secret-bearer-token';
+    try {
+      const client = createApiClient('https://api.example.com', {
+        type: 'bearer',
+        envVar: 'TEST_AUTH_TOKEN',
+      }, { allowPrivateRedirect: false });
+
+      await assert.rejects(
+        () => client('GET', '/resource'),
+        // assertSafeUrl will block other.example.com as a public host only when
+        // allowPrivateRedirect is false — but the key assertion is on headers
+        // below. Use a broad matcher so the test passes on any error shape.
+        () => true,
+      );
+    } catch {
+      // ignore errors from assertSafeUrl; we only care about the headers check
+    } finally {
+      delete process.env.TEST_AUTH_TOKEN;
+    }
+
+    // The second fetch call must NOT carry Authorization
+    assert.ok(fetchCalls.length >= 2, 'Expected at least two fetch calls (original + redirect)');
+    const redirectCall = fetchCalls[1];
+    assert.ok(
+      !Object.keys(redirectCall.headers).some(k => k.toLowerCase() === 'authorization'),
+      `Authorization header must be stripped on cross-origin redirect, got headers: ${JSON.stringify(Object.keys(redirectCall.headers))}`,
+    );
+  });
+
+  it('strips Cookie and Proxy-Authorization on cross-origin redirect', async () => {
+    const fetchCalls = [];
+
+    globalThis.fetch = async (url, init) => {
+      fetchCalls.push({ url, headers: { ...init.headers } });
+
+      if (url === 'https://api.example.com/resource') {
+        return {
+          type: 'basic',
+          status: 302,
+          headers: {
+            get: (name) => name === 'location' ? 'https://cdn.other.com/resource' : null,
+          },
+        };
+      }
+      return { ok: true, status: 200, text: async () => '{}' };
+    };
+
+    // Manually craft a client and inject Cookie + Proxy-Authorization via beforeRequest
+    const client = createApiClient('https://api.example.com', null, {
+      beforeRequest: async () => ({
+        headers: {
+          'Cookie': 'session=abc',
+          'Proxy-Authorization': 'Basic xyz',
+        },
+      }),
+    });
+
+    try {
+      await client('GET', '/resource');
+    } catch {
+      // May fail on assertSafeUrl; the header assertion is what matters
+    }
+
+    assert.ok(fetchCalls.length >= 2, 'Expected redirect to trigger second fetch');
+    const redirectHeaders = fetchCalls[1].headers;
+    assert.ok(
+      !Object.keys(redirectHeaders).some(k => k.toLowerCase() === 'cookie'),
+      'Cookie must be stripped on cross-origin redirect',
+    );
+    assert.ok(
+      !Object.keys(redirectHeaders).some(k => k.toLowerCase() === 'proxy-authorization'),
+      'Proxy-Authorization must be stripped on cross-origin redirect',
+    );
+  });
+
+  it('preserves Authorization header on same-origin redirect', async () => {
+    const fetchCalls = [];
+
+    globalThis.fetch = async (url, init) => {
+      fetchCalls.push({ url, headers: { ...init.headers } });
+
+      if (url === 'https://api.example.com/old-path') {
+        return {
+          type: 'basic',
+          status: 301,
+          headers: {
+            get: (name) => name === 'location' ? 'https://api.example.com/new-path' : null,
+          },
+        };
+      }
+      return { ok: true, status: 200, text: async () => '{}' };
+    };
+
+    process.env.SAME_ORIGIN_TOKEN = 'same-origin-secret';
+    try {
+      const client = createApiClient('https://api.example.com', {
+        type: 'bearer',
+        envVar: 'SAME_ORIGIN_TOKEN',
+      });
+      await client('GET', '/old-path');
+    } finally {
+      delete process.env.SAME_ORIGIN_TOKEN;
+    }
+
+    assert.ok(fetchCalls.length >= 2, 'Expected redirect to trigger second fetch');
+    // On 301 the method downgrades to GET so body is dropped, but Authorization
+    // must still be present because the origin is the same.
+    const redirectHeaders = fetchCalls[1].headers;
+    assert.ok(
+      Object.keys(redirectHeaders).some(k => k.toLowerCase() === 'authorization'),
+      `Authorization must be preserved on same-origin redirect, got: ${JSON.stringify(Object.keys(redirectHeaders))}`,
+    );
+  });
+
+  // Issue #20: multi-hop redirect chains where the second Location is relative
+  // must resolve against the previous hop's URL, not the original request URL.
+  it('resolves relative Location on second hop against first hop URL, not original URL', async () => {
+    const fetchCalls = [];
+
+    globalThis.fetch = async (url, _init) => {
+      fetchCalls.push(url);
+
+      if (url === 'https://api.example.com/start') {
+        // Hop 1: redirect to a completely different origin
+        return {
+          type: 'basic',
+          status: 302,
+          headers: {
+            get: (name) => name === 'location' ? 'https://cdn.example.com/base/' : null,
+          },
+        };
+      }
+      if (url === 'https://cdn.example.com/base/') {
+        // Hop 2: relative redirect — should resolve against https://cdn.example.com/base/
+        return {
+          type: 'basic',
+          status: 301,
+          headers: {
+            get: (name) => name === 'location' ? 'final' : null,
+          },
+        };
+      }
+      // Final destination
+      return { ok: true, status: 200, text: async () => '{"arrived":true}' };
+    };
+
+    // We bypass assertSafeUrl by allowing private redirects; cdn.example.com is
+    // public so it will be allowed by default, but allowPrivateRedirect: true
+    // ensures no unexpected rejection.
+    const client = createApiClient('https://api.example.com', null, {
+      allowPrivateRedirect: true,
+    });
+
+    await client('GET', '/start');
+
+    assert.ok(fetchCalls.length >= 3, `Expected 3 fetch calls, got ${fetchCalls.length}: ${fetchCalls.join(', ')}`);
+    // The relative 'final' on hop 2 must resolve against https://cdn.example.com/base/
+    // yielding https://cdn.example.com/base/final, NOT https://api.example.com/final.
+    assert.equal(
+      fetchCalls[2],
+      'https://cdn.example.com/base/final',
+      `Third fetch must resolve relative Location against hop-1 URL. Got: ${fetchCalls[2]}`,
+    );
+  });
+
+  // Issue #17 follow-up (PR #37 review): once a credential header has been
+  // stripped due to a cross-origin redirect, it must NOT be reintroduced by a
+  // subsequent same-origin redirect. Otherwise multi-hop chains can resurrect
+  // Authorization on the 2nd foreign hop, defeating the strip.
+  it('does not reintroduce stripped credentials on subsequent same-origin hops', async () => {
+    const fetchCalls = [];
+
+    globalThis.fetch = async (url, init) => {
+      fetchCalls.push({ url, headers: { ...(init?.headers || {}) } });
+
+      if (url === 'https://api.example.com/start') {
+        // Hop 0 (initial) → cross-origin redirect to cdn.example.com
+        return {
+          type: 'basic',
+          status: 302,
+          headers: {
+            get: (name) => name === 'location' ? 'https://cdn.example.com/intermediate' : null,
+          },
+        };
+      }
+      if (url === 'https://cdn.example.com/intermediate') {
+        // Hop 1 → SAME-ORIGIN redirect, still on cdn.example.com.
+        // The bug: this hop would re-include Authorization because the
+        // strip branch only fires when sameOrigin is false.
+        return {
+          type: 'basic',
+          status: 302,
+          headers: {
+            get: (name) => name === 'location' ? 'https://cdn.example.com/final' : null,
+          },
+        };
+      }
+      // Final destination
+      return { ok: true, status: 200, text: async () => '{"arrived":true}' };
+    };
+
+    const client = createApiClient('https://api.example.com', {
+      type: 'bearer',
+      value: 'super-secret-token',
+    }, { allowPrivateRedirect: true });
+
+    await client('GET', '/start');
+
+    assert.ok(fetchCalls.length >= 3, `Expected 3 fetch calls, got ${fetchCalls.length}`);
+
+    // Hop 0 to api.example.com — Authorization MUST be present (origin matches).
+    const hop0 = fetchCalls[0].headers;
+    assert.ok(
+      Object.keys(hop0).some(k => k.toLowerCase() === 'authorization'),
+      `Hop 0 (api.example.com) must carry Authorization. Got: ${JSON.stringify(Object.keys(hop0))}`,
+    );
+
+    // Hop 1 to cdn.example.com — Authorization MUST be stripped (cross-origin).
+    const hop1 = fetchCalls[1].headers;
+    assert.ok(
+      !Object.keys(hop1).some(k => k.toLowerCase() === 'authorization'),
+      `Hop 1 (cdn.example.com, cross-origin) must NOT carry Authorization. Got: ${JSON.stringify(Object.keys(hop1))}`,
+    );
+
+    // Hop 2 to cdn.example.com/final — same-origin to hop 1, but credential
+    // was already stripped at the trust boundary and MUST stay stripped.
+    const hop2 = fetchCalls[2].headers;
+    assert.ok(
+      !Object.keys(hop2).some(k => k.toLowerCase() === 'authorization'),
+      `Hop 2 (same-origin to hop 1) must NOT reintroduce Authorization. Got: ${JSON.stringify(Object.keys(hop2))}`,
+    );
+  });
+});

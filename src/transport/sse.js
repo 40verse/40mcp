@@ -482,6 +482,23 @@ export async function createSseTransport(server, options = {}) {
  return;
  }
 
+ // Cross-principal ownership check: in multi-token mode, verify that the
+ // bearer principal who authenticated this POST owns the target session.
+ // Single-token mode (both null) is a no-op.
+ if (transport._frontdoorPrincipal !== null &&
+     postAuth.principal !== null &&
+     postAuth.principal !== transport._frontdoorPrincipal) {
+ emitEvent('sse.cross_principal_denied', {
+ sessionId,
+ sessionPrincipal: transport._frontdoorPrincipal,
+ requestPrincipal: postAuth.principal,
+ clientIp: req.socket.remoteAddress || 'unknown',
+ });
+ res.writeHead(403);
+ res.end('Forbidden');
+ return;
+ }
+
  // Enforce a per-request socket timeout ONLY on message POSTs
  // (not the long-lived GET /sse stream). A slow
  // POST that drips body bytes to stay under the idle timer would

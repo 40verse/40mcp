@@ -19,7 +19,7 @@
  */
 
 import { readFile, stat } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { BridgeError, BridgeErrorCode } from '../errors.js';
 
 /** Hard ceiling for settings file size. Mirrors MAX_CONFIG_FILE_BYTES. */
@@ -179,9 +179,12 @@ async function fileExists(path) {
  * Validate a parsed settings object.
  *
  * @param {any} settings
+ * @param {object} [opts]
+ * @param {string} [opts.cwd] - Working directory used for path-containment checks (default: process.cwd()).
  * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
  */
-export function validateSettings(settings) {
+export function validateSettings(settings, opts = {}) {
+  const { cwd = process.cwd() } = opts;
   const errors = [];
   const warnings = [];
 
@@ -198,7 +201,7 @@ export function validateSettings(settings) {
 
   if (settings.instance !== undefined) validateInstance(settings.instance, errors);
   if (settings.bridge !== undefined) validateBridge(settings.bridge, errors);
-  if (settings.frontdoor !== undefined) validateFrontdoor(settings.frontdoor, errors, warnings);
+  if (settings.frontdoor !== undefined) validateFrontdoor(settings.frontdoor, errors, warnings, cwd);
 
   return { valid: errors.length === 0, errors, warnings };
 }
@@ -328,7 +331,7 @@ function validateBridgeVault(vault, errors) {
   }
 }
 
-function validateFrontdoor(frontdoor, errors, warnings) {
+function validateFrontdoor(frontdoor, errors, warnings, cwd) {
   if (!isPlainObject(frontdoor)) {
     errors.push('settings.frontdoor must be an object');
     return;
@@ -365,7 +368,7 @@ function validateFrontdoor(frontdoor, errors, warnings) {
   }
   if (frontdoor.surface !== undefined) validateFrontdoorSurface(frontdoor.surface, errors);
   for (const key of ['policy', 'tenantMap', 'steering']) {
-    if (frontdoor[key] !== undefined) validatePathWrapper(frontdoor[key], `settings.frontdoor.${key}`, errors);
+    if (frontdoor[key] !== undefined) validatePathWrapper(frontdoor[key], `settings.frontdoor.${key}`, errors, cwd);
   }
   if (frontdoor.telemetry !== undefined) {
     if (!isPlainObject(frontdoor.telemetry)) {
@@ -494,7 +497,7 @@ function validateTransport(transport, label, errors) {
   }
 }
 
-function validatePathWrapper(value, label, errors) {
+function validatePathWrapper(value, label, errors, cwd) {
   if (!isPlainObject(value)) {
     errors.push(`${label} must be an object`);
     return;
@@ -502,9 +505,33 @@ function validatePathWrapper(value, label, errors) {
   for (const key of Object.keys(value)) {
     if (key !== 'path') errors.push(`${label}: unknown key "${key}"`);
   }
-  if (value.path !== undefined && value.path !== null && typeof value.path !== 'string') {
-    errors.push(`${label}.path must be a string`);
+  if (value.path !== undefined && value.path !== null) {
+    if (typeof value.path !== 'string') {
+      errors.push(`${label}.path must be a string`);
+    } else if (!isPathContained(value.path, cwd)) {
+      errors.push(
+        `${label}.path must be a relative path contained within the working directory (got "${value.path}")`,
+      );
+    }
   }
+}
+
+/**
+ * Return true only when `p` resolves to a path strictly inside `cwd`.
+ * Rejects absolute paths and any path that escapes via `..` traversal.
+ *
+ * @param {string} p   - The path value from settings.
+ * @param {string} cwd - Working directory to treat as the containment root.
+ * @returns {boolean}
+ */
+function isPathContained(p, cwd) {
+  // Reject absolute paths outright — they can target arbitrary locations.
+  if (isAbsolute(p)) return false;
+  const abs = resolve(cwd, p);
+  const rel = relative(cwd, abs);
+  // A safe relative path never starts with '..' and is never empty (which
+  // would mean it equals cwd itself — a directory, not a file).
+  return rel.length > 0 && !rel.startsWith('..');
 }
 
 function hasAnyAuth(auth) {

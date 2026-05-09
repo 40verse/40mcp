@@ -486,10 +486,20 @@ export function createApiClient(baseUrl, authConfig, hooks) {
     }
 
     let response;
+    // Track the URL of the most-recently-fetched hop so that relative
+    // Location headers on subsequent hops resolve correctly (issue #20).
+    let currentUrl = url;
     try {
       response = await fetch(url, init);
       // Manual redirect loop — bounded at 5 hops.
       let hops = 0;
+      // Once a credential header is stripped due to a cross-origin redirect,
+      // it must stay stripped for every subsequent hop — even if a later hop
+      // is same-origin with its predecessor. Otherwise rebuilding `redirectInit`
+      // from the original `init.headers` on each iteration silently
+      // re-introduces the credential after the trust boundary was already
+      // crossed (issue #17 follow-up).
+      const persistentlyStrippedHeaders = new Set();
       while (
         response &&
         (response.type === 'opaqueredirect' ||
@@ -519,7 +529,10 @@ export function createApiClient(baseUrl, authConfig, hooks) {
         }
         let nextUrl;
         try {
-          nextUrl = new URL(loc, url).toString();
+          // Resolve against currentUrl (the previous hop's URL) so that
+          // relative Location headers on multi-hop chains work correctly
+          // instead of always resolving against the original request URL (#20).
+          nextUrl = new URL(loc, currentUrl).toString();
         } catch {
           throw new ApiError(
             BridgeErrorCode.API_NETWORK,
@@ -559,6 +572,32 @@ export function createApiClient(baseUrl, authConfig, hooks) {
           redirectInit.method = 'GET';
           delete redirectInit.body;
         }
+        // Strip credential headers on cross-origin redirects (issue #17).
+        // Browsers do this per the Fetch spec; Node's fetch does not.
+        const sameOrigin = (() => {
+          try { return new URL(nextUrl).origin === new URL(currentUrl).origin; }
+          catch { return false; }
+        })();
+        if (!sameOrigin) {
+          persistentlyStrippedHeaders.add('authorization');
+          persistentlyStrippedHeaders.add('cookie');
+          persistentlyStrippedHeaders.add('proxy-authorization');
+        }
+        // Apply persistent strips on every hop, regardless of this hop's
+        // same-origin status. A header that was stripped on an earlier
+        // cross-origin hop must not be re-introduced from `init.headers` by
+        // a later same-origin hop.
+        if (persistentlyStrippedHeaders.size > 0) {
+          redirectInit.headers = { ...(init.headers || {}) };
+          for (const k of Object.keys(redirectInit.headers)) {
+            if (persistentlyStrippedHeaders.has(k.toLowerCase())) {
+              delete redirectInit.headers[k];
+            }
+          }
+        }
+        // Update currentUrl before fetching the next hop so that the next
+        // iteration resolves relative Locations correctly (#20).
+        currentUrl = nextUrl;
         response = await fetch(nextUrl, redirectInit);
       }
     } catch (err) {

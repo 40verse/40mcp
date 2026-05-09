@@ -326,12 +326,27 @@ export function createWebhookListener(config) {
   }
 
   // Validate routes
+  // A01: mirror the reverse-bridge guard — hard-error on non-loopback routes
+  // without a secret; warn on loopback routes without a secret.
+  const bindHost = host;
+  const isLoopback = bindHost === '127.0.0.1' || bindHost === 'localhost' || bindHost === '::1';
+
   for (const route of routes) {
     if (!route.path || !SAFE_PATH_PATTERN.test(route.path)) {
       throw new BridgeError(BridgeErrorCode.CONFIG_INVALID, `Invalid webhook route path: "${route.path}"`);
     }
     if (!route.tool) {
       throw new BridgeError(BridgeErrorCode.CONFIG_MISSING_FIELD, `Webhook route ${route.path} requires a tool name`);
+    }
+    if (!route.secret) {
+      if (!isLoopback) {
+        throw new BridgeError(
+          BridgeErrorCode.CONFIG_INVALID,
+          `[${name}] Webhook route "${route.path}" has no secret configured but the listener is bound to non-loopback host "${bindHost}". ` +
+          `Set route.secret or bind to 127.0.0.1.`,
+        );
+      }
+      process.stderr.write(`[${name}] WARNING: webhook route "${route.path}" has no secret — all requests will be dispatched unauthenticated\n`);
     }
   }
 
@@ -539,7 +554,12 @@ export function createWebhookListener(config) {
     if (route.response !== 'sync') {
       res.setHeader('Content-Type', 'application/json');
       res.writeHead(202);
-      res.end(JSON.stringify({ status: 'accepted', tool: route.tool }));
+      // Omit the tool name on routes without a secret to reduce recon surface —
+      // an unauthenticated caller learns nothing about which tool is being dispatched.
+      const accepted202 = route.secret
+        ? { status: 'accepted', tool: route.tool }
+        : { status: 'accepted' };
+      res.end(JSON.stringify(accepted202));
 
       // Fire and forget — rate-limited error logging to prevent log flooding
       dispatch(route.tool, args)

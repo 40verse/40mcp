@@ -2,7 +2,7 @@
 
 ## 0.1.1-beta.0
 
-_Released 2026-04-19._
+_Released 2026-04-20._
 
 This marks the beginning of the repo, but it's not the beginning of the story. See [`docs/lineage-note.md`](docs/lineage-note.md) for more detail about why this repo has been given a fresh start for the public repo.
 

@@ -395,6 +395,7 @@ OAuth2 auto-refreshes tokens with expiry-aware caching and concurrent request co
 40mcp doctor <config>                 Auth / reachability / shape diagnostics
 40mcp vault <sub>                     Sealed-vault ops (init, seal, list,
                                       rotate, rotate-kek, delete, recover, daemon)
+40mcp settings <sub>                  Settings ops (show)
 ```
 
 ## Architecture
@@ -432,8 +433,8 @@ D4: The Tesseract (self-reference + security)
 
 Meta:
 +-- index.d.ts             Full TypeScript declarations
-+-- errors.js              Structured error taxonomy (19 codes)
-+-- cli.js                 14 subcommands
++-- errors.js              Structured error taxonomy (22 codes)
++-- cli.js                 15 subcommands
 
 configs/                   Community configs (see directory for current list)
 +-- github.json            GitHub API
@@ -511,7 +512,7 @@ For AI-assisted contributors: [AGENTS.md](AGENTS.md) covers codebase orientation
 
 ## Integration Guide
 
-Detailed setup for Claude Desktop, Cursor, VS Code, Claude Code, and SSE deployments: [docs/ai-workflow.md](docs/ai-workflow.md)
+Detailed setup for Claude Desktop, Cursor, VS Code, Claude Code, and SSE deployments: [docs/AI_WORKFLOW.md](docs/AI_WORKFLOW.md)
 
 ## Configuration & Operator Docs
 

@@ -43,6 +43,7 @@ MCP (Model Context Protocol) is Anthropic's open standard — often called "USB-
 | `init` | Scaffold a starter config interactively |
 | `doctor <config>` | Diagnose a config: auth, reachability, tool-shape checks |
 | `vault <sub>` | Sealed vault ops — `init`, `seal`, `list`, `rotate`, `rotate-kek`, `delete`, `recover`, `daemon` |
+| `settings <sub>` | Settings ops — `show` (display merged settings + env overlays) |
 
 ### Shipped modules (programmatic API)
 
@@ -64,6 +65,7 @@ createReverseBridge()        MCP → REST bridge
 generateOpenApiSpec()        MCP tool set → OpenAPI 3.1 document
 connectStdio()               MCP-to-MCP client (stdio)
 connectSse()                 MCP-to-MCP client (SSE)
+connectStreamableHttp()      MCP-to-MCP client (Streamable HTTP)
 connectFromConfig()          MCP-to-MCP client (from .mcp.json)
 connectMany()                Multi-server MCP aggregator
 createWebhookListener()      HTTP webhook → tool dispatch
