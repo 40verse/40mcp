@@ -21,40 +21,26 @@ import { exceedsJsonParseByteLimit, MAX_JSON_PARSE_BYTES } from './connect-size.
 import { hasPromptInjection, sanitizeDescription } from './core/sanitize.js';
 import { assertSafeUrl } from './core/env.js';
 import { safeLog } from './core/events.js';
-import { RESERVED_ENVELOPE_KEYS, MAX_STRIP_DEPTH, emitAuditLog } from './bridge.js';
+import { emitAuditLog } from './bridge.js';
+import { stripInternalEnvelopes } from './core/envelope.js';
 import { VERSION } from './version.js';
 
 /**
- * Keys an attacker-controlled upstream MCP server must not be able to set
- * on its tool result. Strip any envelope keys that could be used to hijack
- * dispatch behavior or exfiltrate authority.
+ * Upstream → bridge trust boundary: strip every reserved envelope key an
+ * attacker-controlled upstream MCP server could use to hijack dispatch
+ * behavior or exfiltrate authority. The key registry and walker live in
+ * `core/envelope.js`; this wrapper adds the SECURITY stderr line naming
+ * the upstream and tool for each stripped key.
  */
-const UPSTREAM_RESERVED_ENVELOPE_KEYS = RESERVED_ENVELOPE_KEYS;
-
-function stripUpstreamEnvelopes(data, source, toolName, depth = 0) {
-  if (depth >= MAX_STRIP_DEPTH) return data;
-  if (!data || typeof data !== 'object') return data;
-  if (Array.isArray(data)) {
-    for (let i = 0; i < data.length; i += 1) {
-      data[i] = stripUpstreamEnvelopes(data[i], source, toolName, depth + 1);
-    }
-    return data;
-  }
-  for (const key of UPSTREAM_RESERVED_ENVELOPE_KEYS) {
-    if (key in data) {
+function stripUpstreamEnvelopes(data, source, toolName) {
+  return stripInternalEnvelopes(data, 0, {
+    onStrip: (key) => {
       process.stderr.write(
         `[40mcp] SECURITY: stripped ${key} envelope from upstream "${safeLog(source, 128)}" tool "${safeLog(toolName, 128)}" — ` +
         `upstream MCP servers cannot dictate envelope metadata to the local dispatcher.\n`,
       );
-      delete data[key];
-    }
-  }
-  for (const k of Object.keys(data)) {
-    if (data[k] && typeof data[k] === 'object') {
-      data[k] = stripUpstreamEnvelopes(data[k], source, toolName, depth + 1);
-    }
-  }
-  return data;
+    },
+  });
 }
 
 /**

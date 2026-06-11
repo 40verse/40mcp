@@ -10,7 +10,8 @@
 import { createServer } from 'node:http';
 import { timingSafeEqual, createHmac, randomBytes } from 'node:crypto';
 import { BridgeError, BridgeErrorCode } from '../errors.js';
-import { sanitizeTransportEgress, validateToolArgs, RESERVED_ENVELOPE_KEYS } from '../bridge.js';
+import { validateToolArgs } from '../bridge.js';
+import { sanitizeTransportEgress, RESERVED_ENVELOPE_KEYS } from '../core/envelope.js';
 import { getByPath } from '../core/object.js';
 import { parseBody } from '../core/body.js';
 import { emitEvent, safeLog } from '../core/events.js';
