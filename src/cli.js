@@ -511,25 +511,14 @@ async function cmdLink(input, flags) {
  process.stderr.write(`[40mcp] Tool filter: ${tools.length}/${before} tools after --allow-tool/--deny-tool\n`);
  }
 
- // Steering: merge a `--steering <file>` spec onto the
- // tool definitions so `runPrehook` / `runPosthook` see `tool.steering`
- // the same way the rest of the runtime does. File shape is a flat
- // `{ "<fully-prefixed-tool-name>": { prehook?, posthook?, write?,
- // authority? } }` map. Unknown tool names are ignored (logged only)
- // so a spec can outlive an upstream restructure without breaking the
- // frontdoor.
- const steeringPath = pick(flags.steering, settings.frontdoor.steering.path);
- const steeringSpec = await loadFrontdoorJson(steeringPath, '--steering');
- if (steeringSpec) {
- const byName = new Map(tools.map((t) => [t.name, t]));
- for (const [toolName, steering] of Object.entries(steeringSpec)) {
- const t = byName.get(toolName);
- if (!t) {
- process.stderr.write(`[40mcp] --steering: no tool matches "${toolName}" — skipping\n`);
- continue;
- }
- t.steering = steering;
- }
+ // Steering was removed. Refuse the flag loudly rather than silently
+ // ignoring it — an operator passing --steering expects enforcement.
+ if (flags.steering !== undefined) {
+ process.stderr.write(
+ '[40mcp] Error: --steering is no longer supported — the steering module was removed. ' +
+ 'Remove the flag, or pin 40mcp to 0.1.x.\n',
+ );
+ process.exit(1);
  }
 
  process.stderr.write(`[40mcp] Linked ${tools.length} tools from ${Object.keys(mcpServers).length} servers${instanceBannerSuffix()}\n`);
@@ -548,7 +537,6 @@ async function cmdLink(input, flags) {
  // an inbound CallTool for a filtered name must 404 even though a
  // compliant ListTools already hides it.
  const allowedNames = new Set(tools.map((t) => t.name));
- const toolsByName = new Map(tools.map((t) => [t.name, t]));
 
  // Create a bridge that wraps the linked tools
  const { Server } = await import('@modelcontextprotocol/sdk/server/index.js');
@@ -556,7 +544,6 @@ async function cmdLink(input, flags) {
  await import('@modelcontextprotocol/sdk/types.js');
  const { emitEvent } = await import('./core/events.js');
  const { currentPrincipal, currentSessionId } = await import('./transport/context.js');
- const { runPrehook, runPosthook, attachSteeringEnvelope } = await import('./steering/hooks.js');
 
  // Dispatch wrapping. Order is inside-out —
  // outermost wrapper runs first:
@@ -639,22 +626,8 @@ async function cmdLink(input, flags) {
  throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
  }
  const startedAt = Date.now();
- const tool = toolsByName.get(name);
  try {
- // Steering prehook runs before dispatch so the agent sees any
- // `prehook.instructions` wrapped into the returned envelope.
- // When no `tool.steering` is configured, `runPrehook` returns a
- // no-op shape and the rest of the call path is unchanged.
- const pre = runPrehook(tool, request.params.arguments || {});
- const raw = await callDispatch(name, pre.args);
- const post = runPosthook(tool, raw, { classification: pre.classification });
- const payload = (pre.instructions || post.instructions || pre.classification)
- ? attachSteeringEnvelope(raw, {
- prehook: pre.instructions,
- posthook: post.instructions,
- classification: pre.classification,
- })
- : raw;
+ const payload = await callDispatch(name, request.params.arguments || {});
  emitEvent('frontdoor.tool_call', {
  tool: name,
  outcome: 'ok',
@@ -978,7 +951,7 @@ function positionalArgs(args) {
 }
 
 /**
- * Load a frontdoor config file (policy, steering, tenant-map) as JSON.
+ * Load a frontdoor config file (policy, tenant-map) as JSON.
  * Shared shape: exits with a clear error if the file is missing,
  * unreadable, or not a JSON object. Returns `null` when the flag is
  * unset so callers can treat it as "feature not configured."
@@ -1929,7 +1902,6 @@ Options:
  --bearer-file <path> JSON {principal: token} for multi-token auth (link --sse)
  --max-sessions-per-principal <N> Concurrent SSE session cap per principal (default 5; multi-token only)
  --policy <path> Policy gate (serve + link) — JSON {toolPolicies, dangerousActions, defaultPolicy}. Honors embedded tool.policy.
- --steering <path> Per-tool steering prehook/posthook — JSON {"<tool>": {prehook, posthook,...}}
  --tenant-map <path> Per-principal tenant scope — JSON {"<principal>": {tenantId, allowlist?, blocklist?}}
  --allowed-origin <o[,o2]> Comma-separated CORS origins for the frontdoor
  --allow-tool <g[,g2]> Glob allowlist for tool names at the frontdoor (link --sse)

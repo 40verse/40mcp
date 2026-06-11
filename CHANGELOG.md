@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### BREAKING: steering module removed
+
+The steering module (`40mcp/steering` — forced-inference write classification, prehook/posthook instruction injection, authority tiers, `AgenticMemory`) has been removed ([#45](https://github.com/40verse/40mcp/issues/45)). It was orthogonal to the bridge by its own definition (SPEC §2) and widened the pre-1.0 public surface without a consuming use case. If demand materializes it can return as a separate package built against the Transform/hook seams.
+
+What changes for operators:
+
+- The `40mcp/steering` subpath export is gone.
+- `tool.steering` in a bridge config now fails `validate` (and therefore `serve`) with a removal message — it is **not** silently ignored, because operators who used `steering.write` for write classification must not believe it is still enforced.
+- `40mcp link --steering <path>` exits with an error.
+- `settings.frontdoor.steering` fails settings validation with a migration message.
+- The `_steering` envelope key remains **reserved**: it is still rejected in tool args and stripped on every egress path, so no operator or upstream can shadow it, and a future external steering package can reclaim it without a breaking envelope change.
+
 ## 0.1.1-beta.0
 
 _Released 2026-04-20._

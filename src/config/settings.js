@@ -5,7 +5,7 @@
  *   instance.*  — identity (name, tags)
  *   bridge.*    — `40mcp serve` knobs (transport, limits, network, vault)
  *   frontdoor.* — `40mcp link` knobs (transport, auth, limits, surface,
- *                 policy/tenant/steering paths, telemetry)
+ *                 policy/tenant paths, telemetry)
  *
  * Precedence at every consumption site is uniform:
  *   CLI flag > env var > settings.json > default.
@@ -71,7 +71,6 @@ export const DEFAULT_SETTINGS = deepFreeze({
     surface: { allowTools: [], denyTools: [], healthDetail: false },
     policy: { path: null },
     tenantMap: { path: null },
-    steering: { path: null },
     telemetry: { audit: true, events: true },
   },
 });
@@ -336,8 +335,14 @@ function validateFrontdoor(frontdoor, errors, warnings, cwd) {
     errors.push('settings.frontdoor must be an object');
     return;
   }
-  const allowed = new Set(['transport', 'auth', 'network', 'limits', 'surface', 'policy', 'tenantMap', 'steering', 'telemetry']);
+  const allowed = new Set(['transport', 'auth', 'network', 'limits', 'surface', 'policy', 'tenantMap', 'telemetry']);
   for (const key of Object.keys(frontdoor)) {
+    if (key === 'steering') {
+      // Removed feature: fail with a migration message instead of a generic
+      // unknown-key error so the operator knows enforcement is gone.
+      errors.push('settings.frontdoor.steering is no longer supported — the steering module was removed. Remove this block, or pin 40mcp to 0.1.x.');
+      continue;
+    }
     if (!allowed.has(key)) errors.push(`settings.frontdoor: unknown key "${key}"`);
   }
   const transportType =
@@ -367,7 +372,7 @@ function validateFrontdoor(frontdoor, errors, warnings, cwd) {
     }
   }
   if (frontdoor.surface !== undefined) validateFrontdoorSurface(frontdoor.surface, errors);
-  for (const key of ['policy', 'tenantMap', 'steering']) {
+  for (const key of ['policy', 'tenantMap']) {
     if (frontdoor[key] !== undefined) validatePathWrapper(frontdoor[key], `settings.frontdoor.${key}`, errors, cwd);
   }
   if (frontdoor.telemetry !== undefined) {
@@ -622,7 +627,6 @@ function mergeFrontdoor(f) {
     surface: { ...DEFAULT_SETTINGS.frontdoor.surface, ...(f.surface || {}) },
     policy: { ...DEFAULT_SETTINGS.frontdoor.policy, ...(f.policy || {}) },
     tenantMap: { ...DEFAULT_SETTINGS.frontdoor.tenantMap, ...(f.tenantMap || {}) },
-    steering: { ...DEFAULT_SETTINGS.frontdoor.steering, ...(f.steering || {}) },
     telemetry: { ...DEFAULT_SETTINGS.frontdoor.telemetry, ...(f.telemetry || {}) },
   };
 }

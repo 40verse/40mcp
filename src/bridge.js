@@ -16,12 +16,6 @@ import { AuditEventCode, BridgeError, BridgeErrorCode } from './errors.js';
 import { resolveEnvVars, assertSafeUrl } from './core/env.js';
 import { safeLog, getTelemetryConfig, buildInstanceField, instanceBannerSuffix } from './core/events.js';
 import { sanitizeDescription, sanitizeMcpToolDescription } from './core/sanitize.js';
-import {
-  applySteering,
-  runPrehook,
-  runPosthook,
-  attachSteeringEnvelope,
-} from './steering/index.js';
 import './core/types.js';
 
 // ─── Runtime input schema validation ────────────────────────────────────────
@@ -66,6 +60,10 @@ const TYPE_CHECKERS = {
  */
 const RESERVED_ARG_KEYS = new Set([
   '__proto__', 'constructor', 'prototype',
+  // `_steering` carried the (removed) steering module's envelope. It stays
+  // reserved so no operator or upstream can shadow it, and so a future
+  // external steering package can reclaim it without a breaking envelope
+  // change.
   '_tenant', '_chain', '_depth', '_steering', '_source', '_upstream',
   '_policy', '_transforms', '_error', '_error_code',
   // applyResponseTransform (transforms/response.js) injects
@@ -566,11 +564,6 @@ function buildDispatcher(toolDefs, apiClient, dispatcherOptions = {}) {
   const afterDispatch = async (name, result, ctx) => {
     return userAfterDispatch(name, result, ctx);
   };
-  // Steering instruction strings flow into the LLM as authoritative agent
-  // instructions and are an in-band prompt-injection channel. Default false:
-  // classification still runs but the free-form instruction text is dropped
-  // before the envelope is built.
-  const allowSteeringInstructions = dispatcherOptions.allowSteeringInstructions === true;
 
   // Global concurrent dispatch cap: prevent an authenticated client from
   // firing unbounded parallel tool calls and saturating the event loop.
@@ -875,54 +868,8 @@ function buildDispatcher(toolDefs, apiClient, dispatcherOptions = {}) {
       }
     }
 
-    // ─── Steering prehook ────────────────────────────────────────────
-    // Structured inference injected BEFORE dispatch. If the tool opts into
-    // steering.write, this also runs classifyWrite() and will throw on any
-    // missing/invalid memory_type|confidence|importance — the "forced
-    // inference at write time" contract. Stateless: no session mutation.
-    let prehookResult;
-    try {
-      prehookResult = runPrehook(tool, args);
-    } catch (err) {
-      const isAuthDenied = /authority denied|authorization denied/i.test(err.message);
-      if (isAuthDenied) {
-        process.stderr.write(`[bridge] steering auth denied for "${name}": ${err.message}\n`);
-        const error = new McpError(ErrorCode.InvalidParams, `Tool "${name}" steering: Authorization denied`);
-        emitAuditLog({ ts: callTs, tool: name, status: 'error', errorCode: error.code, durationMs: Date.now() - callTs });
-        throw error;
-      }
-      const error = new McpError(ErrorCode.InvalidParams, `Tool "${name}" steering prehook: ${err.message}`);
-      emitAuditLog({ ts: callTs, tool: name, status: 'error', errorCode: error.code, durationMs: Date.now() - callTs });
-      throw error;
-    }
-    const steeringClassification = prehookResult.classification;
-    // Drop steering instruction text unless the operator opted in. The
-    // classification path is preserved because it's the legitimate, non-
-    // prompt-injection use of steering.
-    const prehookInstructions = allowSteeringInstructions ? prehookResult.instructions : null;
-    // Preserve non-enumerable `_tenant` across the prehook args rewrite.
-    // If the prehook returns a new object (rather than modifying the same
-    // reference), copy the caller's `_tenant` across with the same
-    // non-enumerable descriptor so `path.js:dispatchToolCall` finds it.
-    const priorTenant = args && typeof args === 'object' ? args._tenant : undefined;
-    args = prehookResult.args;
-    if (
-      priorTenant !== undefined &&
-      args &&
-      typeof args === 'object' &&
-      args._tenant === undefined
-    ) {
-      Object.defineProperty(args, '_tenant', {
-        value: priorTenant,
-        enumerable: false,
-        writable: true,
-        configurable: true,
-      });
-    }
-
-    // MCP tool-call boundary: beforeDispatch fires AFTER tenant resolve and
-    // AFTER prehook (applyToDispatch-equivalent arg rewrite), BEFORE the HTTP
-    // dispatch body. Do not conflate with beforeRequest — that's the HTTP
+    // MCP tool-call boundary: beforeDispatch fires AFTER tenant resolve,
+    // BEFORE the HTTP dispatch body. Do not conflate with beforeRequest — that's the HTTP
     // boundary and runs INSIDE dispatchToolCall/createApiClient. A throw
     // here aborts the dispatch; the caller sees the error and afterDispatch
     // still fires (via the outer finally) with context.error set.
@@ -963,52 +910,7 @@ function buildDispatcher(toolDefs, apiClient, dispatcherOptions = {}) {
       result = applyResponseTransform(result, tool.response);
     }
 
-    // ─── Steering posthook ───────────────────────────────────────────
-    // Return-instructions injected AFTER dispatch. The agent reads these
-    // alongside the result to decide what to do next. Still stateless —
-    // the server just shapes the response, it doesn't remember anything.
-    const posthookResult = runPosthook(tool, result, { classification: steeringClassification });
-    const posthookInstructions = allowSteeringInstructions ? posthookResult.instructions : null;
-    result = posthookResult.result;
-
-    // If any steering produced output, wrap the payload in an envelope so
-    // the MCP client sees { value, _steering: { … } } instead of bare data.
-    if (prehookInstructions || posthookInstructions || steeringClassification) {
-      result = attachSteeringEnvelope(result, {
-        prehook: prehookInstructions,
-        posthook: posthookInstructions,
-        classification: steeringClassification,
-      });
-    }
-
-    // Audit log with steering metadata
-    const auditEntry = { ts: callTs, tool: name, status: 'success', durationMs: Date.now() - callTs };
-    if (steeringClassification) {
-      auditEntry.steering = {
-        memory_type: steeringClassification.memory_type,
-        decay_policy_class: steeringClassification.decay_policy.class,
-        importance: steeringClassification.importance,
-      };
-    }
-    if (prehookInstructions || posthookInstructions) {
-      auditEntry.steering_hooks = {
-        prehook: Boolean(prehookInstructions),
-        posthook: Boolean(posthookInstructions),
-      };
-    }
-    emitAuditLog(auditEntry);
-
-    // mem_release completion signal for steered writes — the stateless
-    // completion marker described in the V-spec Contribution 6. The agent
-    // can also call mem_release explicitly via a downstream MCP server.
-    if (steeringClassification) {
-      emitAuditLog({
-        ts: Date.now(),
-        event: 'mem_release',
-        tool: name,
-        steering: { memory_type: steeringClassification.memory_type },
-      });
-    }
+    emitAuditLog({ ts: callTs, tool: name, status: 'success', durationMs: Date.now() - callTs });
 
     return result;
   }
@@ -1053,12 +955,6 @@ export function createRestBridge(config) {
     auth,
     hooks,
     tools: toolDefs = [],
-    // Steering instruction strings are an in-band prompt-injection channel.
-    // Default OFF: tool steering can still run
-    // for write classification (memory_type/confidence/importance) but the
-    // free-form prehook/posthook instruction text never reaches the LLM
-    // unless the operator explicitly opts in. Set true at your own risk.
-    allowSteeringInstructions = false,
     // Optional dispatch wrapper. If present, called with the bridge's raw
     // `dispatch(name, args, opts)` and expected to return a function with
     // the same signature. The wrapped function is used both for the
@@ -1161,9 +1057,6 @@ export function createRestBridge(config) {
 
   const apiClient = createApiClient(resolvedBaseUrl, auth, effectiveHooks);
 
-  // Apply steering to tools: inject required fields for steered writes
-  const steeringAppliedTools = toolDefs.map(applySteering);
-
   // MCP tool-call boundary hooks. These are distinct from
   // beforeRequest/afterRequest which run at the HTTP boundary inside
   // createApiClient. Default to no-op async fns when unset so the dispatch
@@ -1184,8 +1077,7 @@ export function createRestBridge(config) {
   // but legal).
   const transportResources = [];
 
-  const dispatch = buildDispatcher(steeringAppliedTools, apiClient, {
-    allowSteeringInstructions,
+  const dispatch = buildDispatcher(toolDefs, apiClient, {
     // Forward settings-sourced dispatch limits. When unset the dispatcher
     // falls back to its built-in defaults (maxConcurrent = 50).
     maxConcurrentDispatches: config.maxConcurrentDispatches,
@@ -1206,7 +1098,7 @@ export function createRestBridge(config) {
     : dispatch;
 
   // Build MCP tool list (strip bridge-specific fields, surface deprecation)
-  const mcpTools = steeringAppliedTools.map((t) => {
+  const mcpTools = toolDefs.map((t) => {
     let description = t.description || '';
     if (t.deprecated) {
       const notice = typeof t.deprecated === 'string' ? t.deprecated : 'This tool is deprecated.';

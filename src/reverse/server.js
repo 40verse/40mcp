@@ -359,13 +359,11 @@ export function createReverseBridge(config) {
         // Call dispatch
         let result = await dispatch(toolName, args);
 
-        // The local dispatcher attaches a `_steering` envelope for any steered
-        // tool even when instructions are suppressed — the `classification`
-        // metadata is always added. Strip both `_steering` and `_chain`
-        // metadata from the REST response body: REST clients are not MCP agents
-        // and have no use for steering/chain metadata. This also prevents chain
-        // error messages (potentially containing upstream API error bodies)
-        // from leaking to external callers.
+        // Strip reserved envelope keys (`_steering`, `_chain`, etc.) from the
+        // REST response body: REST clients are not MCP agents and have no use
+        // for internal dispatch metadata. This also prevents chain error
+        // messages (potentially containing upstream API error bodies) from
+        // leaking to external callers.
         result = stripInternalEnvelopes(result);
 
         sendJson(res, 200, { result });

@@ -8,7 +8,7 @@
  *
  * Surface files (canonical test suite):
  *   src/security/invariants/ssrf.test.js       — SSRF / URL / network safety
- *   src/security/invariants/policy.test.js     — Policy / authority / steering
+ *   src/security/invariants/policy.test.js     — Policy gate
  *   src/security/invariants/vault.test.js      — Vault passphrase / key safety
  *   src/security/invariants/webhook.test.js    — Webhook timestamp parsing
  *   src/security/invariants/tenant.test.js     — Tenant scope isolation

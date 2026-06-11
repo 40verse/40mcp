@@ -13,12 +13,6 @@ import { executeChain } from './chain.js';
 import { resolveEnvVars } from '../core/env.js';
 import { validateToolArgs, sanitizeTransportEgress, emitAuditLog } from '../bridge.js';
 import { sanitizeMcpToolDescription } from '../core/sanitize.js';
-import {
-  applySteering,
-  runPrehook,
-  runPosthook,
-  attachSteeringEnvelope,
-} from '../steering/index.js';
 import { safeLog } from '../core/events.js';
 import '../core/types.js';
 
@@ -35,8 +29,6 @@ export const INTERNAL_CHAIN_DISPATCH = Symbol('40mcp:internal-chain-dispatch');
 // ─── Tool dispatcher ────────────────────────────────────────────────────────
 
 function buildMixerDispatcher(toolMap, options = {}) {
-  const allowSteeringInstructions = options.allowSteeringInstructions === true;
-
   // The mixer dispatch surface never had the `maxConcurrentDispatches` cap
   // that bridge.js enforces. An authenticated client on a mixer-served
   // deployment could fire unbounded parallel CallTool and saturate the event
@@ -73,9 +65,7 @@ function buildMixerDispatcher(toolMap, options = {}) {
       throw new McpError(ErrorCode.InvalidParams, `Tool "${name}": ${validationError}`);
     }
 
-    // Compound tool chain — mixer-served chain tools short-circuit the
-    // steering pipeline because `executeChain` recurses back into dispatch for
-    // every inner step, where steering runs per step. Pass `innerChainDispatch`
+    // Compound tool chain — pass `innerChainDispatch`
     // (stamps the trust Symbol) so chain recursion bypasses the outer
     // concurrency cap and keeps `_chainStack` / `_depth` propagated. Also seed
     // `_currentChainName` with the outer tool name so the invocation-cycle
@@ -90,41 +80,11 @@ function buildMixerDispatcher(toolMap, options = {}) {
       });
     }
 
-    // ─── Steering prehook ────────────────────────────────────────────
-    // The mixer dispatch path was the only surface that skipped
-    // `runPrehook`/`runPosthook`/`attachSteeringEnvelope`. A tool with
-    // `steering.write: true` served via mixer would accept calls without
-    // memory_type/confidence/importance validation. Mirror the bridge.js
-    // pipeline here so every dispatch surface enforces identical steering
-    // semantics.
-    let prehookResult;
-    try {
-      prehookResult = runPrehook(tool, args);
-    } catch (err) {
-      throw new McpError(ErrorCode.InvalidParams, `Tool "${name}" steering prehook: ${err.message}`);
-    }
-    const steeringClassification = prehookResult.classification;
-    const prehookInstructions = allowSteeringInstructions ? prehookResult.instructions : null;
-    args = prehookResult.args;
-
     let result = await dispatchToolCall(tool, args, apiClient);
 
     // Response transforms
     if (tool.response) {
       result = applyResponseTransform(result, tool.response);
-    }
-
-    // ─── Steering posthook ───────────────────────────────────────────
-    const posthookResult = runPosthook(tool, result, { classification: steeringClassification });
-    const posthookInstructions = allowSteeringInstructions ? posthookResult.instructions : null;
-    result = posthookResult.result;
-
-    if (prehookInstructions || posthookInstructions || steeringClassification) {
-      result = attachSteeringEnvelope(result, {
-        prehook: prehookInstructions,
-        posthook: posthookInstructions,
-        classification: steeringClassification,
-      });
     }
 
     return result;
@@ -310,35 +270,14 @@ function _createMixerInner(config) {
         continue;
       }
 
-      // Apply steering schema enrichment at registration time so tools with
-      // `steering.write: true` expose `memory_type` / `confidence` / `importance`
-      // to the MCP client exactly as they do when served via bridge.js. A
-      // malformed `steering` config on one tool used to throw out of
-      // `applySteering`, killing the entire mixer construction. In non-strict
-      // mode, log + skip the offending tool so a single bad server doesn't
-      // crash the whole mixer. In strict mode, rethrow.
-      let enrichedTool;
-      try {
-        enrichedTool = applySteering(tool);
-      } catch (steeringErr) {
-        if (strict) throw steeringErr;
-        process.stderr.write(
-          `[mixer] WARNING: tool "${finalToolName}" has malformed steering config — ` +
-          `skipping. ${safeLog(steeringErr.message, 200)}\n`,
-        );
-        continue;
-      }
-
       // Register tool — also store the serverName for richer
       // duplicate-collision diagnostics.
-      toolMap.set(finalToolName, { tool: enrichedTool, apiClient, serverName });
+      toolMap.set(finalToolName, { tool, apiClient, serverName });
     }
   }
 
   // Build dispatch function
-  const dispatch = buildMixerDispatcher(toolMap, {
-    allowSteeringInstructions: config.allowSteeringInstructions === true,
-  });
+  const dispatch = buildMixerDispatcher(toolMap);
 
   // Build MCP tool list
   // Tool descriptions come from connected upstream MCP servers that may not have

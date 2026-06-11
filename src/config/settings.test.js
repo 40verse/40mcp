@@ -16,9 +16,6 @@ function settingsWithTenantMap(pathValue) {
   return { frontdoor: { tenantMap: { path: pathValue } } };
 }
 
-function settingsWithSteering(pathValue) {
-  return { frontdoor: { steering: { path: pathValue } } };
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // frontdoor.policy.path — containment checks
@@ -34,11 +31,6 @@ describe('validateSettings — frontdoor.*.path containment', () => {
 
   it('accepts a simple relative path for tenantMap', () => {
     const result = validateSettings(settingsWithTenantMap('config/tenants.json'), { cwd: CWD });
-    assert.equal(result.valid, true, `unexpected errors: ${result.errors.join(', ')}`);
-  });
-
-  it('accepts a simple relative path for steering', () => {
-    const result = validateSettings(settingsWithSteering('steering/rules.json'), { cwd: CWD });
     assert.equal(result.valid, true, `unexpected errors: ${result.errors.join(', ')}`);
   });
 
@@ -76,12 +68,6 @@ describe('validateSettings — frontdoor.*.path containment', () => {
     assert.ok(result.errors.some((e) => e.includes('settings.frontdoor.tenantMap.path')));
   });
 
-  it('rejects an absolute path for steering', () => {
-    const result = validateSettings(settingsWithSteering('/tmp/steering.json'), { cwd: CWD });
-    assert.equal(result.valid, false);
-    assert.ok(result.errors.some((e) => e.includes('settings.frontdoor.steering.path')));
-  });
-
   // Directory-traversal rejection
 
   it('rejects a simple ../ traversal for policy', () => {
@@ -108,10 +94,15 @@ describe('validateSettings — frontdoor.*.path containment', () => {
     assert.ok(result.errors.some((e) => e.includes('settings.frontdoor.tenantMap.path')));
   });
 
-  it('rejects a traversal for steering', () => {
-    const result = validateSettings(settingsWithSteering('../steering.json'), { cwd: CWD });
+  // Removed feature: steering must fail loudly with a migration message
+
+  it('rejects frontdoor.steering with a removal message', () => {
+    const result = validateSettings({ frontdoor: { steering: { path: 'steering/rules.json' } } }, { cwd: CWD });
     assert.equal(result.valid, false);
-    assert.ok(result.errors.some((e) => e.includes('settings.frontdoor.steering.path')));
+    assert.ok(
+      result.errors.some((e) => e.includes('steering') && e.includes('no longer supported')),
+      `expected steering removal error, got: ${result.errors.join(', ')}`,
+    );
   });
 
   // Error message quality
@@ -124,19 +115,18 @@ describe('validateSettings — frontdoor.*.path containment', () => {
     );
   });
 
-  it('reports errors for all three fields independently', () => {
+  it('reports errors for both fields independently', () => {
     const result = validateSettings(
       {
         frontdoor: {
           policy: { path: '/etc/policy' },
           tenantMap: { path: '../../tenants.json' },
-          steering: { path: '/tmp/steering' },
         },
       },
       { cwd: CWD },
     );
     assert.equal(result.valid, false);
-    const fields = ['settings.frontdoor.policy.path', 'settings.frontdoor.tenantMap.path', 'settings.frontdoor.steering.path'];
+    const fields = ['settings.frontdoor.policy.path', 'settings.frontdoor.tenantMap.path'];
     for (const field of fields) {
       assert.ok(
         result.errors.some((e) => e.includes(field)),
