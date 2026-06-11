@@ -5,11 +5,9 @@ import {
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import { dispatchToolCall } from './core/path.js';
 import { createStdioTransport } from './transport/stdio.js';
 import { createSseTransport } from './transport/sse.js';
 import { createApiClient } from './core/client.js';
-import { applyResponseTransform } from './transforms/response.js';
 import { executeChain } from './compose/chain.js';
 import { assertValidConfig } from './validate.js';
 import { AuditEventCode, BridgeError, BridgeErrorCode } from './errors.js';
@@ -26,6 +24,8 @@ import {
   sanitizeResultObject,
   sanitizeTransportEgress,
 } from './core/envelope.js';
+import { runLeafDispatch } from './core/pipeline.js';
+import { composeTransforms } from './transforms/index.js';
 import './core/types.js';
 
 // Trust-boundary envelope primitives live in `src/core/envelope.js` — the
@@ -389,6 +389,12 @@ function buildDispatcher(toolDefs, apiClient, dispatcherOptions = {}) {
     return userAfterDispatch(name, result, ctx);
   };
 
+  // Optional composed Transform (SPEC §2). Applied once per inbound
+  // tools/call: applyToDispatch after arg validation, applyToResult after
+  // tool.response shaping (inside runLeafDispatch) or after a chain
+  // completes. Chain sub-dispatches are internal and skip the seam.
+  const transform = dispatcherOptions.transform || null;
+
   // Global concurrent dispatch cap: prevent an authenticated client from
   // firing unbounded parallel tool calls and saturating the event loop.
   // The cap covers ALL transports feeding this dispatcher — SSE, webhook,
@@ -651,6 +657,55 @@ function buildDispatcher(toolDefs, apiClient, dispatcherOptions = {}) {
       throw error;
     }
 
+    // Transform seam — applyToDispatch (SPEC §2 "Pipeline order": after
+    // auth/tenant resolve and validation, before hooks.beforeDispatch).
+    // Runs once per inbound tools/call; chain sub-dispatches are internal
+    // and skip it.
+    const applySeam = transform && !isChainSubDispatch;
+    const transformContext = {
+      toolName: name,
+      tenant: tenantCtx || undefined,
+    };
+    if (applySeam && typeof transform.applyToDispatch === 'function') {
+      let rewritten;
+      try {
+        rewritten = transform.applyToDispatch(name, args, transformContext);
+      } catch (err) {
+        const error = new McpError(ErrorCode.InvalidParams, `Tool "${name}" transform "${transform.name}" applyToDispatch: ${err.message}`);
+        emitAuditLog({ ts: callTs, tool: name, status: 'error', errorCode: error.code, durationMs: Date.now() - callTs });
+        throw error;
+      }
+      // Preserve non-enumerable `_tenant` across the args rewrite. If the
+      // transform returns a new object, copy the caller's `_tenant` across
+      // with the same non-enumerable descriptor so `path.js:dispatchToolCall`
+      // finds it.
+      const priorTenant = args && typeof args === 'object' ? args._tenant : undefined;
+      args = rewritten;
+      if (
+        priorTenant !== undefined &&
+        args &&
+        typeof args === 'object' &&
+        args._tenant === undefined
+      ) {
+        Object.defineProperty(args, '_tenant', {
+          value: priorTenant,
+          enumerable: false,
+          writable: true,
+          configurable: true,
+        });
+      }
+      // Re-validate after the rewrite so a Transform cannot smuggle reserved
+      // keys (or schema-invalid values) into the dispatch path. Transforms
+      // are operator-supplied, but the reserved-key invariant holds at every
+      // boundary regardless of who writes the args.
+      const postTransformError = validateToolArgs(args, tool.inputSchema);
+      if (postTransformError) {
+        const error = new McpError(ErrorCode.InvalidParams, `Tool "${name}" after transform "${transform.name}": ${postTransformError}`);
+        emitAuditLog({ ts: callTs, tool: name, status: 'error', errorCode: error.code, durationMs: Date.now() - callTs });
+        throw error;
+      }
+    }
+
     // Tool deprecation warning.
     // `tool.deprecated` / `tool.successor` are caller-controlled strings
     // (loaded from config, or stitched from an upstream MCP server). A
@@ -683,7 +738,12 @@ function buildDispatcher(toolDefs, apiClient, dispatcherOptions = {}) {
         response: tool.chainResponse || undefined,
       };
       try {
-        const result = await callChain(name, tool.chain, args, options);
+        let result = await callChain(name, tool.chain, args, options);
+        // Transform seam — applyToResult on the completed chain result
+        // (top-level calls only; inner steps already skipped the seam).
+        if (applySeam && typeof transform.applyToResult === 'function') {
+          result = transform.applyToResult(name, result, transformContext);
+        }
         emitAuditLog({ ts: callTs, tool: name, status: 'success', durationMs: Date.now() - callTs });
         return result;
       } catch (err) {
@@ -704,34 +764,27 @@ function buildDispatcher(toolDefs, apiClient, dispatcherOptions = {}) {
     };
     await beforeDispatch(name, args, beforeDispatchContext);
 
-    // Shared dispatch: path interpolation + query/body mapping. Thread the
-    // external cancellation signal (if any) into the outbound fetch via
-    // `dispatchToolCall`'s opts argument. When absent, apiClient wiring is
+    // Canonical leaf dispatch (core/pipeline.js): outbound HTTP fetch →
+    // strip upstream envelope keys → tool.response shaping →
+    // Transform.applyToResult. Thread the external cancellation signal (if
+    // any) into the outbound fetch; when absent, apiClient wiring is
     // unchanged — the internal timeout controller runs alone.
-    const dispatchToolCallOpts =
-      chainOptions && chainOptions.signal instanceof AbortSignal
-        ? { signal: chainOptions.signal }
-        : undefined;
     let result;
     try {
-      result = await dispatchToolCall(tool, args, apiClient, dispatchToolCallOpts);
+      result = await runLeafDispatch({
+        name,
+        tool,
+        args,
+        apiClient,
+        signal: chainOptions && chainOptions.signal instanceof AbortSignal
+          ? chainOptions.signal
+          : undefined,
+        transform: applySeam ? transform : undefined,
+        context: transformContext,
+      });
     } catch (err) {
       emitAuditLog({ ts: callTs, tool: name, status: 'error', errorCode: err?.code || 'UNKNOWN', durationMs: Date.now() - callTs });
       throw err;
-    }
-
-    // Upstream REST responses are attacker-controllable. Strip the FULL
-    // reserved-envelope set (including bridge response-metadata keys like
-    // `_truncated`) before transforms run. Without this, a malicious upstream
-    // could pre-set `{ _truncated: true }` in its payload and deceive the LLM
-    // about whether the response was truncated.
-    result = stripInternalEnvelopes(result);
-
-    // Apply response transforms if defined. After this, any response-metadata
-    // keys (`_truncated`, `_summary`, `_original_count`) are trusted bridge
-    // output and must survive transport egress (see EGRESS_STRIP_KEYS).
-    if (tool.response) {
-      result = applyResponseTransform(result, tool.response);
     }
 
     emitAuditLog({ ts: callTs, tool: name, status: 'success', durationMs: Date.now() - callTs });
@@ -779,6 +832,16 @@ export function createRestBridge(config) {
     auth,
     hooks,
     tools: toolDefs = [],
+    // Optional Transform seam (SPEC §2 "Architectural interfaces"). An
+    // array of Transform-conformant objects ({ name, applyToComponents?,
+    // applyToDispatch?, applyToResult? }) composed in order. Build-time:
+    // applyToComponents reshapes { tools } before the dispatcher and MCP
+    // tool list are built. Call-time: applyToDispatch runs after arg
+    // validation and before beforeDispatch; applyToResult runs after
+    // tool.response shaping and before egress-sanitize. Transforms run
+    // once per inbound tools/call — chain sub-dispatches are internal and
+    // do not re-trigger them.
+    transforms: transformList,
     // Optional dispatch wrapper. If present, called with the bridge's raw
     // `dispatch(name, args, opts)` and expected to return a function with
     // the same signature. The wrapped function is used both for the
@@ -881,6 +944,37 @@ export function createRestBridge(config) {
 
   const apiClient = createApiClient(resolvedBaseUrl, auth, effectiveHooks);
 
+  // Compose the optional Transform list into a single Transform. An empty
+  // or absent list means the seam is inert (null — cheaper to branch on
+  // than the identity composite).
+  let transform = null;
+  if (transformList !== undefined) {
+    if (!Array.isArray(transformList)) {
+      throw new Error(
+        `[${name}] config.transforms must be an array of Transform-conformant objects ` +
+        '({ name, applyToComponents?, applyToDispatch?, applyToResult? }).',
+      );
+    }
+    if (transformList.length > 0) {
+      transform = composeTransforms(...transformList);
+    }
+  }
+
+  // Build-time Transform seam: applyToComponents reshapes the component
+  // surface before the dispatcher and MCP tool list are built. A Transform
+  // that returns a malformed shape is a build-time misconfiguration — fail
+  // loudly rather than silently ignoring it.
+  let effectiveToolDefs = toolDefs;
+  if (transform && typeof transform.applyToComponents === 'function') {
+    const reshaped = transform.applyToComponents({ tools: toolDefs });
+    if (!reshaped || !Array.isArray(reshaped.tools)) {
+      throw new Error(
+        `[${name}] Transform "${transform.name}" applyToComponents must return { tools: Tool[] } — got ${reshaped === null ? 'null' : typeof reshaped}.`,
+      );
+    }
+    effectiveToolDefs = reshaped.tools;
+  }
+
   // MCP tool-call boundary hooks. These are distinct from
   // beforeRequest/afterRequest which run at the HTTP boundary inside
   // createApiClient. Default to no-op async fns when unset so the dispatch
@@ -901,13 +995,14 @@ export function createRestBridge(config) {
   // but legal).
   const transportResources = [];
 
-  const dispatch = buildDispatcher(toolDefs, apiClient, {
+  const dispatch = buildDispatcher(effectiveToolDefs, apiClient, {
     // Forward settings-sourced dispatch limits. When unset the dispatcher
     // falls back to its built-in defaults (maxConcurrent = 50).
     maxConcurrentDispatches: config.maxConcurrentDispatches,
     beforeDispatch,
     afterDispatch,
     shutdownState,
+    transform,
   });
 
   // Apply the optional wrapDispatch hook. Used by `40mcp serve --policy`
@@ -922,7 +1017,7 @@ export function createRestBridge(config) {
     : dispatch;
 
   // Build MCP tool list (strip bridge-specific fields, surface deprecation)
-  const mcpTools = toolDefs.map((t) => {
+  const mcpTools = effectiveToolDefs.map((t) => {
     let description = t.description || '';
     if (t.deprecated) {
       const notice = typeof t.deprecated === 'string' ? t.deprecated : 'This tool is deprecated.';

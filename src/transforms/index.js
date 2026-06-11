@@ -28,18 +28,25 @@
  *   that method, in order. Missing methods on individual constituents are
  *   no-ops in the composite.
  *
- * ### What this module does NOT ship
+ * ### Bridge integration
  *
- * - Bridge integration. The canonical pipeline order (SPEC §2 "Pipeline
- *   order") documents where `applyToDispatch` and `applyToResult`
- *   will run once Transform is wired into `src/bridge.js`. That wiring lands
- *   in a future PR.
- * - Any refactor of `src/transforms/response.js` (`applyResponseTransform`).
- *   That module remains the stable 1.0 surface. Wrapping it as a
- *   Transform-conformant object is deferred.
+ * `createRestBridge({ transforms: [...] })` and
+ * `createMixer({ transforms: [...] })` consume Transform lists, composed in
+ * order via `composeTransforms`. The canonical pipeline order (SPEC §2
+ * "Pipeline order") is implemented in `src/core/pipeline.js`:
+ * `applyToDispatch` runs after arg validation and before
+ * `hooks.beforeDispatch`; `applyToResult` runs after `tool.response`
+ * shaping and before egress-sanitize. Transforms run once per inbound
+ * tools/call — chain sub-dispatches are internal and skip the seam.
+ *
+ * `src/transforms/response.js` (`applyResponseTransform`) remains the
+ * stable 1.0 surface; `responseTransform(spec)` wraps it as a
+ * Transform-conformant object for use in a `transforms` list.
  *
  * @module transforms
  */
+
+import { applyResponseTransform } from './response.js';
 
 /**
  * Tool-name / prefix character charset and length, pinned in SPEC.md §2
@@ -208,4 +215,32 @@ export function composeTransforms(...transforms) {
   }
 
   return Object.freeze(composite);
+}
+
+/**
+ * Wrap a declarative response-shaping spec (`pick` / `omit` / `limit` /
+ * `flatten` / `template` / `summary` / `tokenBudget` — see
+ * `applyResponseTransform`) as a Transform-conformant object, so the
+ * existing shaping vocabulary can participate in a `transforms` list
+ * alongside custom Transforms.
+ *
+ * Note the seam difference: a per-tool `tool.response` spec runs INSIDE the
+ * canonical leaf (before `applyToResult`); a `responseTransform` in the
+ * bridge-level `transforms` list runs at the `applyToResult` position and
+ * therefore applies to every tool the bridge serves.
+ *
+ * @param {object} spec - Response-shaping spec, passed to `applyResponseTransform`.
+ * @param {object} [opts]
+ * @param {string} [opts.name='response'] - Transform identity for audit logs.
+ * @returns {Readonly<object>} frozen Transform with `applyToResult`.
+ */
+export function responseTransform(spec, opts = {}) {
+  if (spec == null || typeof spec !== 'object') {
+    throw new TypeError('responseTransform(spec) requires a response-shaping spec object.');
+  }
+  const { name = 'response' } = opts;
+  return createTransform({
+    name,
+    applyToResult: (_toolName, result, _context) => applyResponseTransform(result, spec),
+  });
 }

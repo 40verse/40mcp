@@ -35,16 +35,20 @@ export { loadHarFile } from './loaders/har.js';
 export { registerLoader, loadFromAny, listLoaders } from './loaders/registry.js';
 
 /**
- * Providers — Provider interface + OpenAPI reference implementation.
+ * Providers — Provider interface + loader adapters.
  *
- * The `providers` namespace exposes the Provider contract and adapters that
- * wrap existing loaders. It is the seam future features (OTEL attribution,
- * multi-version tools, progressive disclosure) will attach to.
+ * The `providers` namespace exposes the Provider contract
+ * (`createProvider`), adapters wrapping the existing loaders (`openapi`,
+ * `graphql`, `har`), and `componentsFromProviders` for gathering a
+ * provider list into one tool set. `createBridgeFromProviders` (exported
+ * below) builds a bridge from providers directly. It is the seam future
+ * features (OTEL attribution, multi-version tools, progressive disclosure)
+ * attach to.
  *
  * The legacy exports above — `loadOpenApiSpec`, `loadGraphqlSchema`,
  * `loadHarFile`, `connectStdio`, `connectSse`, `createReverseBridge` —
- * remain the stable surface. Provider adapters are additive; no loader's
- * shape or signature changes in this PR.
+ * remain the stable surface. The Provider path is additive; no loader's
+ * shape or signature changed.
  */
 export * as providers from './providers/index.js';
 
@@ -60,15 +64,15 @@ export { applyResponseTransform } from './transforms/response.js';
  * `applyToDispatch` and `applyToResult` run in the canonical pipeline.
  *
  * The existing `applyResponseTransform` export above remains the stable 1.0
- * surface for token-budget response shaping. Wrapping it behind the new
- * Transform interface is additive and lands in a future PR; no caller's
- * behaviour changes in this one.
+ * surface for token-budget response shaping; `transforms.responseTransform`
+ * wraps it as a Transform for use in a bridge/mixer `transforms` list.
  */
 export * as transforms from './transforms/index.js';
 
 // Compose
 export { executeChain } from './compose/chain.js';
 export { createMixer } from './compose/mixer.js';
+export { createBridgeFromProviders } from './compose/from-providers.js';
 
 // Transport
 export { createStdioTransport, createSseTransport, createTransport } from './transport/index.js';
