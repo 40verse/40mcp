@@ -2,6 +2,8 @@
 
 > A 40verse project. The name is not a version number.
 
+> **This is a design-philosophy essay — the *why*, not the *how*.** It explains the geometric model behind 40mcp's architecture and why the capabilities are layered the way they are. It is not a usage guide. If you are here to decide which command to run, start with the [README decision tree](README.md#which-command-do-i-run); for the normative contract, see [SPEC.md](SPEC.md). The geometry language below (line, plane, cube, tesseract) lives here and only here.
+
 ---
 
 ## Why This Exists

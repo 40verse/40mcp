@@ -1,5 +1,7 @@
 # Bridge vs Frontdoor
 
+> **New here?** Start with the [README decision tree](../README.md#which-command-do-i-run) to pick a command, then come back for the full `serve`-vs-`link` mental model.
+
 Two shapes, two commands, two clusters in `40mcp.settings.json`. Knowing which applies when is the single most important mental model in 40mcp.
 
 ---
