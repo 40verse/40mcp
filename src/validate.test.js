@@ -220,6 +220,72 @@ describe('validateConfig', () => {
     });
     assert.ok(!result.errors.some((e) => e.includes('required')));
   });
+
+  // ── configVersion schema field (issue #47) ────────────────────────────────
+  it('accepts configVersion: 1 without error or warning', () => {
+    const result = validateConfig({
+      configVersion: 1,
+      baseUrl: 'https://api.example.com',
+      tools: [
+        { name: 'ping', description: 'Ping', method: 'GET', path: '/ping', inputSchema: { type: 'object', properties: {} } },
+      ],
+    });
+    assert.equal(result.valid, true);
+    assert.equal(result.errors.length, 0);
+    assert.ok(!result.warnings.some((w) => w.includes('configVersion')));
+  });
+
+  it('treats omitted configVersion as valid (implied 1)', () => {
+    const result = validateConfig({
+      baseUrl: 'https://api.example.com',
+      tools: [{ name: 'ping', description: 'Ping', method: 'GET', path: '/ping', inputSchema: { type: 'object', properties: {} } }],
+    });
+    assert.equal(result.valid, true);
+    assert.ok(!result.errors.some((e) => e.includes('configVersion')));
+  });
+
+  it('rejects configVersion other than 1', () => {
+    for (const bad of [2, '1', true, 0, 1.5]) {
+      const result = validateConfig({
+        configVersion: bad,
+        baseUrl: 'https://api.example.com',
+        tools: [],
+      });
+      assert.equal(result.valid, false, `configVersion ${JSON.stringify(bad)} should be rejected`);
+      assert.ok(result.errors.some((e) => e.includes('configVersion')));
+    }
+  });
+
+  it('does not overload version (server-version string) as the schema version', () => {
+    // `version: "1.0.0"` is the MCP server-version string and must remain valid.
+    const result = validateConfig({
+      version: '1.0.0',
+      baseUrl: 'https://api.example.com',
+      tools: [{ name: 'ping', description: 'Ping', method: 'GET', path: '/ping', inputSchema: { type: 'object', properties: {} } }],
+    });
+    assert.equal(result.valid, true);
+    assert.ok(!result.errors.some((e) => e.includes('configVersion') || e.includes('version')));
+  });
+
+  // ── tools + mcpServers ambiguity warning (issue #47) ──────────────────────
+  it('warns when a config has both tools and mcpServers', () => {
+    const result = validateConfig({
+      baseUrl: 'https://api.example.com',
+      tools: [{ name: 'ping', description: 'Ping', method: 'GET', path: '/ping', inputSchema: { type: 'object', properties: {} } }],
+      mcpServers: { upstream: { command: '40mcp', args: ['serve', 'x.json'] } },
+    });
+    const ambiguity = result.warnings.find((w) => w.includes('mcpServers') && w.includes('tools'));
+    assert.ok(ambiguity, 'expected an ambiguity warning naming both surfaces');
+    assert.ok(ambiguity.includes('link'), 'warning should state which command uses mcpServers');
+  });
+
+  it('does not warn for a tools-only config', () => {
+    const result = validateConfig({
+      baseUrl: 'https://api.example.com',
+      tools: [{ name: 'ping', description: 'Ping', method: 'GET', path: '/ping', inputSchema: { type: 'object', properties: {} } }],
+    });
+    assert.ok(!result.warnings.some((w) => w.includes('mcpServers')));
+  });
 });
 
 describe('assertValidConfig', () => {

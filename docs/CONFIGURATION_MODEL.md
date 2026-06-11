@@ -12,6 +12,34 @@ Env vars sit between runtime and CLI, but **only for keys that have an explicit 
 
 ---
 
+## The three config surfaces
+
+There are exactly **three** distinct config surfaces. They are never merged with each other — each is consumed by a different code path. This is the single ownership table; everything below elaborates it.
+
+| Surface | Example file | Shape (key) | Describes | Read by | Owns (authoritative for) |
+|---|---|---|---|---|---|
+| **Bridge config** | `bridge.json`, `github.json` | top-level `tools[]` (+ `baseUrl`, `auth`) | One REST/GraphQL API and the MCP tools it exposes | `serve`, `from-*`/`from`, `reverse`, `inspect`, `validate`, `mix` | Tool/topology shape: baseUrl, auth kind, tool definitions, response transforms, policy annotations |
+| **Link config** | `.mcp.json`, `*.mcp.json` | top-level `mcpServers{}` map | A set of upstream MCP servers to spawn and stitch together | `link` | Upstream identity (entry key = namespace), spawn command/args, transport to each upstream |
+| **Settings** | `40mcp.settings.json` | `bridge`/`frontdoor`/`instance` blocks | How *this running instance* behaves | every command, via `loadAndApplySettings` | Runtime: transport, limits, auth wiring, policy/tenant paths, vault, telemetry, instance metadata |
+
+**What overrides what.** Bridge config and link config are *inputs to a command* — only one of the two applies to any given invocation (you either `serve` a bridge config or `link` a link config). Settings layer onto whichever command you ran, and CLI flags layer on top of settings:
+
+```
+CLI flag  >  env var (where an overlay exists)  >  settings.json  >  config/default
+```
+
+Bridge config and settings own **disjoint** concerns: the bridge config never sets a port or a concurrency limit (that's settings), and settings never define a tool (that's the bridge config). Where a runtime knob *can* be expressed both ways (e.g. transport), settings win over the bridge config's static value, and a CLI flag wins over settings — see *Precedence* below.
+
+### Schema version field (`configVersion`)
+
+Bridge configs may carry an optional `"configVersion": 1`. It is the **config-schema** version, set to `1` today, and is **distinct from `"version"`** — `version` is the MCP server-version string (e.g. `"1.0.0"`) shown to MCP clients. The field is named `configVersion` rather than `version` because the latter was already taken; see [SPEC.md §6](../SPEC.md#6-config-contract). When omitted, the implied version is `1`. `validate` accepts `configVersion: 1` silently and errors on any other value. `40mcp init` and `generateFromSpec` emit it.
+
+### Ambiguous files (`tools` + `mcpServers` together)
+
+A single file that contains **both** a `tools` array and an `mcpServers` map is ambiguous and is never merged. `serve`/`from`/`reverse`/`inspect` read `tools` and ignore `mcpServers`; `link` reads `mcpServers` and ignores `tools`. `validate` emits a warning naming which surface wins. Split such a file into a bridge config and a link config.
+
+---
+
 ## Topology vs runtime
 
 ### Bridge config (topology)

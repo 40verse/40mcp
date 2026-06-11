@@ -27,6 +27,36 @@ export function validateConfig(config) {
     return { valid: false, errors: ['Config must be an object'], warnings: [] };
   }
 
+  // Schema version (issue #47).
+  //
+  // The bare `version` key is ALREADY taken — bridge configs use it as the
+  // MCP server-version string ("1.0.0") passed straight through to
+  // createRestBridge. We therefore introduce `configVersion` as the schema
+  // version field rather than overloading `version`. Only `configVersion: 1`
+  // (the implied/current version) is accepted. Any other value — 2, "1",
+  // true, etc. — is an error so a config authored against a future or
+  // mistyped schema fails loudly instead of being silently mis-parsed.
+  if (config.configVersion !== undefined && config.configVersion !== 1) {
+    errors.push(
+      `config.configVersion "${config.configVersion}" is not supported — only configVersion 1 exists. ` +
+      `Remove the field (it defaults to 1) or pin a 40mcp release that understands this version.`,
+    );
+  }
+
+  // Ambiguity guard (issue #47): a single file carrying BOTH `tools` and
+  // `mcpServers` fuses two separate config surfaces into one. The loaders
+  // never merge them — `serve`/`from`/`reverse`/`inspect` read `config.tools`
+  // and ignore `mcpServers`, while `link` reads `mcpServers` and ignores
+  // `tools`. Warn so the operator knows which half is live for the command
+  // they ran instead of one being silently dropped.
+  if (Array.isArray(config.tools) && config.mcpServers && typeof config.mcpServers === 'object') {
+    warnings.push(
+      'config has both "tools" and "mcpServers" — these are separate config surfaces and are never merged. ' +
+      '`serve`/`from`/`reverse`/`inspect` use "tools" and ignore "mcpServers"; `link` uses "mcpServers" and ignores "tools". ' +
+      'Split them into two files to remove the ambiguity.',
+    );
+  }
+
   // Name
   if (config.name && typeof config.name !== 'string') {
     errors.push('config.name must be a string');

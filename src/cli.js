@@ -1555,7 +1555,10 @@ async function cmdInit(_flags) {
  }
 
  // ── Build bridge.json ───────────────────────────────────────────────────
+ // `configVersion` is the config-schema version (issue #47), pinned to 1.
+ // It is distinct from `version`, the MCP server-version string.
  const bridgeConfig = {
+ configVersion: 1,
  name: apiName,
  version: '1.0.0',
  };
