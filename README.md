@@ -79,6 +79,24 @@ Both upstream configs are public, require no credentials, and stay inside the MC
 
 ---
 
+## Which command do I run?
+
+Start here. Pick the row that matches what you have and what you want — each command links to the deeper docs.
+
+| You have… | …and you want to | Run | You want this when… |
+|-----------|------------------|-----|---------------------|
+| One API (config, spec, or endpoint) | Expose it as MCP tools | [`serve`](docs/BRIDGE_VS_FRONTDOOR.md#bridge-40mcp-serve) | You have a single API and just need it callable by an agent. |
+| Many MCP servers already running | Front them behind one authenticated surface | [`link`](docs/BRIDGE_VS_FRONTDOOR.md#frontdoor-40mcp-link) | You have several upstream MCP servers and want one namespace and one auth boundary. See [FRONTDOOR.md](docs/FRONTDOOR.md) to publish it over SSE. |
+| Many REST configs | Combine them into one MCP server | [`mix`](SPEC.md#2-10-scope) | You have multiple REST APIs and want them in a single tool surface (no separate auth boundary). |
+| MCP tools you want as plain HTTP | Expose MCP tools as a REST API | [`reverse`](SPEC.md#2-10-scope) | A non-MCP client needs to call your tools over REST (plus an auto-generated OpenAPI spec). |
+| An undocumented API (browser traffic) | Generate tools from a recording | [`from-har`](#from-browser-traffic-no-spec) | The API has no spec — you only have captured HTTP traffic. |
+| A documented API (OpenAPI/Swagger) | Generate tools from the spec | [`from-openapi`](#from-an-openapi-spec) | You have an OpenAPI 3.x or Swagger 2.x document. |
+| A GraphQL endpoint | Generate tools by introspection | [`from-graphql`](#input-type-reference) | You have a GraphQL endpoint that supports introspection. |
+
+> **One API → `serve`. Many MCP upstreams → `link`. Many REST configs → `mix`.** That covers most decisions. For the full `serve`-vs-`link` mental model, see [docs/BRIDGE_VS_FRONTDOOR.md](docs/BRIDGE_VS_FRONTDOOR.md).
+
+---
+
 ## Install
 
 ```bash
@@ -399,23 +417,23 @@ OAuth2 auto-refreshes tokens with expiry-aware caching and concurrent request co
 
 ## Architecture
 
-Modules mapped to dimensions:
+Modules grouped by responsibility:
 
 ```
-D1: The Line (core bridge)
+Core bridge
 +-- bridge.js              Dispatch engine
 +-- core/client.js         API client (auth, OAuth2, timeout)
 +-- core/path.js           URL interpolation, query strings
 +-- transport/             stdio + SSE
 
-D2: The Plane (loaders + discovery)
+Loaders + discovery
 +-- openapi.js             OpenAPI 3.x + Swagger 2.x
 +-- loaders/graphql.js     GraphQL introspection
 +-- loaders/har.js         HAR traffic recording
 +-- loaders/registry.js    Plugin system + auto-detection
 +-- generate.js            AI-assisted config generation
 
-D3: The Cube (composition + shaping)
+Composition + shaping
 +-- compose/chain.js       Compound chains (depth-guarded)
 +-- compose/mixer.js       Multi-server mixing
 +-- transforms/response.js Token-aware response shaping
@@ -423,7 +441,7 @@ D3: The Cube (composition + shaping)
 +-- webhook/listener.js    Webhook ingestion
 +-- tenant/scope.js        Multi-tenant scoping
 
-D4: The Tesseract (self-reference + security)
+Self-reference + security
 +-- reverse/server.js      MCP -> REST (+ auto OpenAPI spec)
 +-- security/vault.js      Sealed credential vault (envelope encryption)
 +-- security/policy.js     Human-in-the-loop gates
@@ -446,9 +464,7 @@ configs/                   Community configs (see directory for current list)
 
 One dependency: `@modelcontextprotocol/sdk`. All other functionality uses Node builtins. Full TypeScript via `.d.ts`.
 
-## The Tesseract
-
-40mcp models its architecture as a tesseract — four nested dimensions where each folds the previous into itself. For the conceptual framing behind the D1–D4 architecture (why each dimension is a structural transformation, not a feature list), see [CONCEPT.md](CONCEPT.md).
+> The four groups above map to the D1–D4 design model in [CONCEPT.md](CONCEPT.md) — read that for the *why*, not the *how*.
 
 ## Local Development Without API Keys
 
@@ -521,6 +537,10 @@ Detailed setup for Claude Desktop, Cursor, VS Code, Claude Code, and SSE deploym
 - [docs/COMMANDS/settings-and-doctor.md](docs/COMMANDS/settings-and-doctor.md) — `settings show` and `doctor` scope
 - [docs/FRONTDOOR.md](docs/FRONTDOOR.md) — published SSE deployment patterns
 - [docs/TESTING.md](docs/TESTING.md) — operator testing strategy for bridges, frontdoors, tenants, and policy gates
+
+## Design philosophy
+
+- [CONCEPT.md](CONCEPT.md) — the design-philosophy essay behind the D1–D4 architecture (the *why*, not the *how*). For day-to-day usage, start with the [decision tree](#which-command-do-i-run) above.
 
 ## License
 
