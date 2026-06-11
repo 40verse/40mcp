@@ -275,7 +275,9 @@ Note: See integration test suite for comprehensive coverage.
 
 ### Schema versioning
 
-Config files do not currently include a `$schema` version field. The implied version is `1`. When a breaking schema change is required, a `"version": 2` field will be added and a migration guide published.
+Bridge configs MAY carry an optional `"configVersion": 1` field. It is the **config-schema** version and is independent of `"version"`, which is the MCP server-version string (e.g. `"1.0.0"`) surfaced to clients. The field is named `configVersion` precisely because `version` was already taken by the server-version string; overloading it would have been ambiguous. When omitted, the implied `configVersion` is `1`. `validate` accepts `configVersion: 1` silently and rejects any other value (`2`, `"1"`, `true`, …) so a config authored against a future, incompatible schema fails loudly. `40mcp init` and `generateFromSpec` emit `configVersion: 1`. When a breaking schema change is required, `configVersion: 2` will be introduced with a migration guide.
+
+The three config surfaces — bridge configs, `.mcp.json` link configs, and `40mcp.settings.json` — what each owns, and the override precedence between them are documented in a single place: [docs/CONFIGURATION_MODEL.md](docs/CONFIGURATION_MODEL.md). A file that carries both `tools` and `mcpServers` is ambiguous: `serve`/`from`/`reverse`/`inspect` read `tools` and `link` reads `mcpServers`; the surfaces are never merged, and `validate` emits a warning naming which one wins.
 
 ### Validation behavior
 

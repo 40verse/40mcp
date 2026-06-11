@@ -25,12 +25,15 @@ export const GENERATE_SYSTEM_PROMPT = `You are a 40mcp config generator. You pro
 You MUST output ONLY valid JSON — no markdown, no explanation, no code fences. The JSON must be a complete 40mcp config:
 
 {
+  "configVersion": 1,
   "name": "service-name",
   "version": "1.0.0",
   "baseUrl": "https://api.example.com",
   "auth": { "type": "bearer", "envVar": "SERVICE_API_KEY" },
   "tools": [ ... ]
 }
+
+(\`configVersion\` is the config-schema version — currently always 1 — and is distinct from \`version\`, which is the MCP server-version string shown to clients.)
 
 ## Tool Definition Schema
 
@@ -383,6 +386,10 @@ export function generateFromSpec(spec, options = {}) {
   }
 
   return {
+    // configVersion is the schema version (issue #47), distinct from the
+    // server-version string carried by `version`. Emit it explicitly so
+    // generated configs are pinned to the schema they were written against.
+    configVersion: 1,
     name: toSnakeCase(info.title || 'api-bridge'),
     version: info.version || '1.0.0',
     baseUrl,
