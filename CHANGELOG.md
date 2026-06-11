@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Provider and Transform seams wired into the dispatch path
+
+The architectural interfaces named in SPEC §2 are now consumed by the runtime instead of being documentation-only ([#43](https://github.com/40verse/40mcp/issues/43)):
+
+- **Canonical leaf pipeline** — `src/core/pipeline.js` (`runLeafDispatch`) is the single implementation of the REST leaf (outbound fetch → upstream envelope strip → `tool.response` shaping → `Transform.applyToResult`), used by both `createRestBridge` and `createMixer`. This also fixes a drift: the mixer leaf skipped the upstream-side `stripInternalEnvelopes` pass, so an upstream REST API could forge bridge response metadata (`{ "_truncated": true }`) that the narrower transport-egress strip deliberately preserves. Mixer-served tools now strip it, matching the bridge.
+- **Transform seam** — `createRestBridge({ transforms: [...] })` and `createMixer({ transforms: [...] })` accept Transform lists (composed via `composeTransforms`). `applyToComponents` reshapes the tool surface at build time; `applyToDispatch` runs after arg validation (args are re-validated afterwards so a Transform cannot smuggle reserved keys); `applyToResult` runs after shaping and before egress-sanitize. Transforms run once per inbound `tools/call`; chain sub-dispatches skip the seam. `transforms.responseTransform(spec)` wraps the declarative shaping vocabulary as a Transform.
+- **Provider wiring** — new `providers.graphql` and `providers.har` adapters join `providers.openapi`; `providers.componentsFromProviders(list)` gathers tools under the SPEC §2 fail-loud collision rule; `createBridgeFromProviders(config)` builds a bridge from providers and ties provider `close()` into the bridge lifecycle. Legacy loader flows are unchanged.
+
+### Reserved-key registry hoisted to core
+
+The reserved-envelope-key registry and strip walkers moved from `bridge.js` to `src/core/envelope.js` ([#44](https://github.com/40verse/40mcp/issues/44)). `bridge.js` re-exports every public name, so existing imports are unaffected. Adding a reserved key in one place now covers every dispatch surface.
+
 ### BREAKING: steering module removed
 
 The steering module (`40mcp/steering` — forced-inference write classification, prehook/posthook instruction injection, authority tiers, `AgenticMemory`) has been removed ([#45](https://github.com/40verse/40mcp/issues/45)). It was orthogonal to the bridge by its own definition (SPEC §2) and widened the pre-1.0 public surface without a consuming use case. If demand materializes it can return as a separate package built against the Transform/hook seams.

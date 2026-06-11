@@ -144,7 +144,7 @@ interface Provider {
 }
 ```
 
-Existing loaders (`loadOpenApiSpec`, `loadGraphqlSchema`, `loadHarFile`, `connectStdio`, `connectSse`, `createReverseBridge`) are wrapped into Provider-conformant objects under `src/providers/`. Legacy loader exports are unchanged.
+The OpenAPI, GraphQL, and HAR loaders are wrapped into Provider-conformant adapters under `src/providers/` (`providers.openapi` / `providers.graphql` / `providers.har`). `componentsFromProviders(providers)` gathers a provider list into one tool set under the fail-loud collision rule, and `createBridgeFromProviders(config)` builds a bridge from providers and ties provider `close()` into the bridge lifecycle. Legacy loader exports are unchanged; the Provider path is additive.
 
 #### Transform
 
@@ -161,6 +161,8 @@ interface Transform {
 
 All three methods are optional; most transforms implement only one. Policy gates and tenant scope are expressible as Transforms.
 
+`createRestBridge({ transforms: [...] })` and `createMixer({ transforms: [...] })` consume Transform lists, composed in order via `composeTransforms`. Transforms run once per inbound `tools/call`; chain sub-dispatches are internal and skip the seam. Args are re-validated after `applyToDispatch`, so a Transform cannot smuggle reserved envelope keys into the dispatch path, and egress-sanitize runs downstream of `applyToResult` (see "Pipeline order"). `transforms.responseTransform(spec)` wraps the declarative response-shaping vocabulary as a Transform.
+
 ### Hook taxonomy
 
 40mcp hooks run at two distinct boundaries. The pairs MUST NOT be collapsed — `beforeRequest`/`afterRequest` concern themselves with the HTTP call to the upstream; `beforeDispatch`/`afterDispatch` concern themselves with the MCP `tools/call` that 40mcp is handling. Future features like OTEL instrumentation and RFC 8693 delegation attach to the dispatch pair.
@@ -174,7 +176,7 @@ All three methods are optional; most transforms implement only one. Policy gates
 
 ### Pipeline order
 
-The dispatch pipeline is ordered. Transforms, hooks, and egress sanitization each run at a specific, named position, and extensions are written against these positions. Any ordering change pre-1.0 is a **BREAKING** change and requires a CHANGELOG entry.
+The dispatch pipeline is ordered. Transforms, hooks, and egress sanitization each run at a specific, named position, and extensions are written against these positions. The REST leaf of this pipeline (outbound fetch → upstream envelope strip → `tool.response` shaping → `Transform.applyToResult`) has a single shared implementation in `src/core/pipeline.js` (`runLeafDispatch`), used by both `createRestBridge` and `createMixer`. Any ordering change pre-1.0 is a **BREAKING** change and requires a CHANGELOG entry.
 
 ```
 inbound MCP tools/call

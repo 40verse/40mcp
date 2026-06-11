@@ -21,20 +21,29 @@
  *
  * - `createProvider({ name, components, close? })` — validating factory that
  *   returns a frozen Provider-conformant object.
- * - `openapi(specOrUrl, opts)` — the one reference implementation, wrapping
- *   `loadOpenApiSpec`.
+ * - `openapi(specOrUrl, opts)` / `graphql(endpointOrSchema, opts)` /
+ *   `har(harOrPath, opts)` — adapters wrapping the corresponding loaders.
+ * - `componentsFromProviders(providers)` — gather `{ tools }` from N
+ *   providers with SPEC §2 collision rules.
+ *
+ * ### Bridge integration
+ *
+ * `componentsFromProviders(providers)` gathers `{ tools }` from a provider
+ * list with fail-loud collision rules, and `createBridgeFromProviders`
+ * (src/compose/from-providers.js) builds a bridge from providers and ties
+ * provider `close()` into the bridge lifecycle. Legacy loaders
+ * (`loadOpenApiSpec`, `loadGraphqlSchema`, `loadHarFile`, `connectStdio`,
+ * `connectSse`, `createReverseBridge`) keep their current return shape and
+ * remain the stable surface — the Provider path is additive.
  *
  * ### What this module does NOT ship
  *
- * - Bridge integration. Providers exist but `createRestBridge` does not yet
- *   consume them through this interface. Legacy loaders (`loadOpenApiSpec`,
- *   `loadGraphqlSchema`, `loadHarFile`, `connectStdio`, `connectSse`,
- *   `createReverseBridge`) keep their current return shape and remain the
- *   stable surface; migration is additive and lands in a future PR.
  * - Transform / Hooks interfaces. Those live in separate modules.
  *
  * @module providers
  */
+
+import { BridgeError, BridgeErrorCode } from '../errors.js';
 
 /**
  * Tool-name / prefix character charset and length, pinned in SPEC.md §2
@@ -108,4 +117,64 @@ export function createProvider(spec) {
   return Object.freeze(provider);
 }
 
+/**
+ * Gather components from N Providers into a single `{ tools }` set.
+ *
+ * This is the Provider-side half of bridge integration: callers resolve a
+ * provider list into one tool array, then hand it to `createRestBridge`
+ * (or use the `createBridgeFromProviders` convenience in
+ * `src/compose/from-providers.js`, which does both steps and wires
+ * provider `close()` into the bridge lifecycle).
+ *
+ * Collision behaviour follows SPEC §2 ("Tool-name invariant"): a duplicate
+ * tool name across providers fails loudly with a `CONFIG_INVALID`
+ * BridgeError naming the conflicting tool and both providers — the same
+ * contract `connectMany` and `createMixer` enforce. There is no silent
+ * drop.
+ *
+ * @param {Array<{ name: string, components: Function, close?: Function }>} providers
+ * @returns {Promise<{ tools: object[] }>}
+ */
+export async function componentsFromProviders(providers) {
+  if (!Array.isArray(providers) || providers.length === 0) {
+    throw new TypeError(
+      'componentsFromProviders(providers) requires a non-empty array of Provider-conformant objects.',
+    );
+  }
+  const tools = [];
+  const originByToolName = new Map();
+  for (const provider of providers) {
+    if (!provider || typeof provider.name !== 'string' || typeof provider.components !== 'function') {
+      throw new TypeError(
+        'componentsFromProviders: every entry must be Provider-conformant ' +
+        '({ name: string, components: () => Promise<{ tools }> }).',
+      );
+    }
+    const components = await provider.components();
+    const providerTools = components && Array.isArray(components.tools) ? components.tools : null;
+    if (!providerTools) {
+      throw new BridgeError(
+        BridgeErrorCode.CONFIG_INVALID,
+        `Provider "${provider.name}" components() did not return { tools: Tool[] }.`,
+      );
+    }
+    for (const tool of providerTools) {
+      const existing = originByToolName.get(tool.name);
+      if (existing !== undefined) {
+        throw new BridgeError(
+          BridgeErrorCode.CONFIG_INVALID,
+          `Duplicate tool name "${tool.name}" from provider "${provider.name}" ` +
+          `(already provided by "${existing}"). Use distinct tool names or a ` +
+          'nameTransform on one provider to disambiguate.',
+        );
+      }
+      originByToolName.set(tool.name, provider.name);
+      tools.push(tool);
+    }
+  }
+  return { tools };
+}
+
 export { openapi } from './openapi.js';
+export { graphql } from './graphql.js';
+export { har } from './har.js';

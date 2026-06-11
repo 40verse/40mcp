@@ -5,10 +5,10 @@ import {
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import { dispatchToolCall } from '../core/path.js';
+import { runLeafDispatch } from '../core/pipeline.js';
+import { composeTransforms } from '../transforms/index.js';
 import { createApiClient } from '../core/client.js';
 import { createStdioTransport } from '../transport/stdio.js';
-import { applyResponseTransform } from '../transforms/response.js';
 import { executeChain } from './chain.js';
 import { resolveEnvVars } from '../core/env.js';
 import { validateToolArgs, emitAuditLog } from '../bridge.js';
@@ -47,6 +47,10 @@ function buildMixerDispatcher(toolMap, options = {}) {
   let inFlightDispatches = 0;
   const INTERNAL_OPTS = Symbol('40mcp:mixer-internal');
 
+  // Optional composed Transform (SPEC §2). Mirrors bridge.js: applied once
+  // per inbound tools/call; chain sub-dispatches are internal and skip it.
+  const transform = options.transform || null;
+
   async function innerDispatch(name, args, chainOptions = {}) {
     args = args || {};
     const entry = toolMap.get(name);
@@ -66,29 +70,60 @@ function buildMixerDispatcher(toolMap, options = {}) {
       throw new McpError(ErrorCode.InvalidParams, `Tool "${name}": ${validationError}`);
     }
 
+    // Transform seam — applyToDispatch after validation, before the
+    // dispatch body, exactly as in bridge.js. Re-validate after the rewrite
+    // so a Transform cannot smuggle reserved keys into the dispatch path.
+    const isChainSubDispatch = chainOptions && chainOptions[INTERNAL_OPTS] === true;
+    const applySeam = transform && !isChainSubDispatch;
+    const transformContext = { toolName: name };
+    if (applySeam && typeof transform.applyToDispatch === 'function') {
+      let rewritten;
+      try {
+        rewritten = transform.applyToDispatch(name, args, transformContext);
+      } catch (err) {
+        throw new McpError(ErrorCode.InvalidParams, `Tool "${name}" transform "${transform.name}" applyToDispatch: ${err.message}`);
+      }
+      args = rewritten;
+      const postTransformError = validateToolArgs(args, tool.inputSchema);
+      if (postTransformError) {
+        throw new McpError(ErrorCode.InvalidParams, `Tool "${name}" after transform "${transform.name}": ${postTransformError}`);
+      }
+    }
+
     // Compound tool chain — pass `innerChainDispatch`
     // (stamps the trust Symbol) so chain recursion bypasses the outer
     // concurrency cap and keeps `_chainStack` / `_depth` propagated. Also seed
     // `_currentChainName` with the outer tool name so the invocation-cycle
-    // detector catches self-recursion before the first sub-dispatch's prehook
-    // runs. The wave concurrency inside `executeChain` bounds fan-out
+    // detector catches self-recursion before the first sub-dispatch runs.
+    // The wave concurrency inside `executeChain` bounds fan-out
     // independently.
     if (tool.chain) {
-      return executeChain(tool.chain, args, innerChainDispatch, {
+      let result = await executeChain(tool.chain, args, innerChainDispatch, {
         ...chainOptions,
         [INTERNAL_OPTS]: true,
         _currentChainName: name,
       });
+      if (applySeam && typeof transform.applyToResult === 'function') {
+        result = transform.applyToResult(name, result, transformContext);
+      }
+      return result;
     }
 
-    let result = await dispatchToolCall(tool, args, apiClient);
-
-    // Response transforms
-    if (tool.response) {
-      result = applyResponseTransform(result, tool.response);
-    }
-
-    return result;
+    // Canonical leaf dispatch (core/pipeline.js): outbound HTTP fetch →
+    // strip upstream envelope keys → tool.response shaping →
+    // Transform.applyToResult. Routing through the shared pipeline also
+    // closes a drift: the mixer leaf used to skip the upstream-side
+    // `stripInternalEnvelopes` pass that bridge.js ran, so an upstream REST
+    // API could forge bridge response metadata (`{ "_truncated": true }`)
+    // that the narrower transport-egress strip deliberately preserves.
+    return runLeafDispatch({
+      name,
+      tool,
+      args,
+      apiClient,
+      transform: applySeam ? transform : undefined,
+      context: transformContext,
+    });
   }
 
   // Outer dispatch with concurrency cap + external option sanitization.
@@ -277,8 +312,22 @@ function _createMixerInner(config) {
     }
   }
 
+  // Compose the optional Transform list (SPEC §2) — mirrors createRestBridge.
+  let transform = null;
+  if (config.transforms !== undefined) {
+    if (!Array.isArray(config.transforms)) {
+      throw new Error(
+        `[${name}] config.transforms must be an array of Transform-conformant objects ` +
+        '({ name, applyToComponents?, applyToDispatch?, applyToResult? }).',
+      );
+    }
+    if (config.transforms.length > 0) {
+      transform = composeTransforms(...config.transforms);
+    }
+  }
+
   // Build dispatch function
-  const dispatch = buildMixerDispatcher(toolMap);
+  const dispatch = buildMixerDispatcher(toolMap, { transform });
 
   // Build MCP tool list
   // Tool descriptions come from connected upstream MCP servers that may not have
