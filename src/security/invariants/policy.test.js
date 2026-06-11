@@ -1,10 +1,9 @@
 /**
- * Security invariants — policy gate and authority surface
+ * Security invariants — policy gate surface
  *
- * Tests for the authority gate (runPrehook, checkAuthority), enum
- * enforcement, policy:deny/require_approval chain bypass prevention,
- * MCP-egress envelope strip, case-insensitive policy lookup, and
- * scope-name validation.
+ * Tests for enum enforcement, policy:deny/require_approval chain bypass
+ * prevention, MCP-egress envelope strip, case-insensitive policy lookup,
+ * and scope-name validation.
  *
  * @module security/invariants/policy
  */
@@ -19,111 +18,13 @@ import {
   MAX_STRIP_DEPTH,
   createRestBridge,
 } from '../../bridge.js';
-import { Authority, resolveAuthority, checkAuthority } from '../../steering/authority.js';
-import { runPrehook } from '../../steering/hooks.js';
 import { createPolicyGate, mergeToolPolicies } from '../policy.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Authority + enum + chain tenant escalation + gate self-exemption
+// Enum + chain tenant escalation + gate self-exemption
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe(' authority gate + enum + cross-feature invariants', () => {
-  it('resolveAuthority refuses prototype-chain lookups (toString attack)', () => {
-    // Same bug class as `required:["toString"]` — `AUTHORITIES["toString"]`
-    // used to walk the prototype chain and return Function.prototype.toString
-    // as if it were a valid preset.
-    assert.throws(() => resolveAuthority('toString'), /Unknown authority preset/);
-    assert.throws(() => resolveAuthority('constructor'), /Unknown authority preset/);
-    assert.throws(() => resolveAuthority('hasOwnProperty'), /Unknown authority preset/);
-    assert.throws(() => resolveAuthority('__proto__'), /Unknown authority preset/);
-  });
-
-  it('resolveAuthority resolves real preset names', () => {
-    assert.ok(resolveAuthority('READONLY'));
-    assert.ok(resolveAuthority('OBSERVER'));
-    assert.ok(resolveAuthority('ROOT'));
-  });
-
-  it('Authority refuses NaN max_confidence / max_importance', () => {
-    // Same bug class as transport.port — `typeof NaN === "number"`.
-    assert.throws(
-      () => Authority({ id: 'x', allowed_memory_types: ['fact'], max_confidence: NaN }),
-      /max_confidence/,
-    );
-    assert.throws(
-      () => Authority({ id: 'x', allowed_memory_types: ['fact'], max_importance: NaN }),
-      /max_importance/,
-    );
-    assert.throws(
-      () => Authority({ id: 'x', allowed_memory_types: ['fact'], max_confidence: Infinity }),
-      /max_confidence/,
-    );
-  });
-
-  it('runPrehook refuses tools with steering.authority but no steering.write', () => {
-    // The whole point of authority is gating writes. A tool config with
-    // `authority: "OBSERVER"` but no `write: true` used to silently
-    // bypass the authority check entirely.
-    const tool = {
-      name: 't',
-      steering: { authority: 'OBSERVER' }, // no write:true
-    };
-    assert.throws(() => runPrehook(tool, {}), /requires write classification|write:true/);
-  });
-
-  it('runPrehook + checkAuthority denies unauthorized memory_type', () => {
-    const tool = {
-      name: 't',
-      steering: {
-        write: true,
-        authority: 'OBSERVER',
-      },
-    };
-    // OBSERVER allows observation/fact/reference but NOT correction
-    assert.throws(
-      () => runPrehook(tool, {
-        memory_type: 'correction',
-        confidence: 0.5,
-        importance: 0.5,
-      }),
-      /authority denied/,
-    );
-  });
-
-  it('checkAuthority refuses missing coordination_scope when allowed_scopes is set', () => {
-    // `coordination_scope == null` used to skip the scope
-    // check. A scope-restricted authority must require an explicit
-    // scope on every call, not silently allow the null case.
-    const auth = Authority({
-      id: 'scoped',
-      allowed_memory_types: ['fact'],
-      allowed_scopes: ['auth'],
-    });
-    const gate = checkAuthority(auth, {
-      memory_type: 'fact',
-      confidence: 0.5,
-      importance: 0.5,
-      coordination_scope: undefined, // attacker omits it
-    });
-    assert.equal(gate.allowed, false);
-    assert.match(gate.reason, /coordination_scope/);
-  });
-
-  it('checkAuthority allows correct scope when allowed_scopes is set', () => {
-    const auth = Authority({
-      id: 'scoped',
-      allowed_memory_types: ['fact'],
-      allowed_scopes: ['auth', 'session'],
-    });
-    const gate = checkAuthority(auth, {
-      memory_type: 'fact',
-      confidence: 0.5,
-      importance: 0.5,
-      coordination_scope: 'auth',
-    });
-    assert.equal(gate.allowed, true);
-  });
-
+describe(' enum + cross-feature invariants', () => {
   it('validateToolArgs ENFORCES enum (not just type)', () => {
     // Single largest finding: schema-declared `enum` was purely
     // declarative documentation; the validator only checked `type`.
@@ -647,10 +548,9 @@ describe('policy falsy bypass and action_type gate', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // M3: invalid toolPolicies values rejected
-//            M5: Authority scope-name validation
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('policy validation and authority scope names', () => {
+describe('policy validation', () => {
   it('createPolicyGate ignores toolPolicies entries with invalid policy values', async () => {
     let dispatched = false;
     const gate = createPolicyGate({
@@ -667,25 +567,5 @@ describe('policy validation and authority scope names', () => {
     assert.ok(dispatched, 'safe_tool with valid allow policy must dispatch');
     await assert.rejects(() => gate('evil_tool', {}), /denied|deny|blocked/i,
       'invalid policy value must be ignored; defaultPolicy deny must apply');
-  });
-
-  it('Authority rejects ".." as a scope name', () => {
-    assert.throws(
-      () => Authority({ id: 'test', ceilings: {}, allowed_scopes: ['..'] }),
-      /invalid scope/i,
-    );
-  });
-
-  it('Authority rejects scopes that start with a non-alphanumeric character', () => {
-    assert.throws(
-      () => Authority({ id: 'test', ceilings: {}, allowed_scopes: ['.hidden'] }),
-      /invalid scope/i,
-    );
-  });
-
-  it('Authority accepts well-formed scope names', () => {
-    assert.doesNotThrow(
-      () => Authority({ id: 'test', ceilings: {}, allowed_scopes: ['read:users', 'write.data', 'admin_v2'] }),
-    );
   });
 });

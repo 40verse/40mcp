@@ -5,7 +5,7 @@
 | Layer | File / source | Owns |
 |---|---|---|
 | Topology | bridge config (`bridge.json`, `github.json`, …) or `.mcp.json` | API/tool shape, upstream command, baseUrl, auth kind |
-| Runtime | `40mcp.settings.json` | Transport, limits, auth wiring, policy/tenant/steering paths, vault, telemetry |
+| Runtime | `40mcp.settings.json` | Transport, limits, auth wiring, policy/tenant paths, vault, telemetry |
 | Override | CLI flags | Explicit one-off overrides for a specific invocation |
 
 Env vars sit between runtime and CLI, but **only for keys that have an explicit env overlay** in the code. See *Precedence* below.

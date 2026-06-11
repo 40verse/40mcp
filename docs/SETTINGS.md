@@ -40,7 +40,7 @@ Inspect what's live:
 
 - `instance.*` — display name + tags. Appears on banners, `/health`, and audit entries.
 - `bridge.*` — consumed by `40mcp serve`. Transport, dispatch limits, request/response size caps, network (SSRF), vault.
-- `frontdoor.*` — consumed by `40mcp link`. Transport, auth, SSE session caps, surface filters, policy/tenant/steering paths, telemetry.
+- `frontdoor.*` — consumed by `40mcp link`. Transport, auth, SSE session caps, surface filters, policy/tenant paths, telemetry.
 
 A `40mcp serve` instance that publishes itself as SSE is still a bridge — it reads `bridge.*`, not `frontdoor.*`. See [BRIDGE_VS_FRONTDOOR.md](BRIDGE_VS_FRONTDOOR.md).
 
@@ -58,7 +58,7 @@ Most operators change these first:
 | `frontdoor.transport.{port,host}` | Port the frontdoor binds on. |
 | `frontdoor.auth.requireBearerEnv` | Bearer auth for the published frontdoor. |
 | `frontdoor.limits.sse.maxConnections` | Tighten connection caps on public SSE. |
-| `frontdoor.{policy,tenantMap,steering}.path` | Wire policy / tenant / steering documents without re-specifying at every `--flag`. |
+| `frontdoor.{policy,tenantMap}.path` | Wire policy / tenant documents without re-specifying at every `--flag`. |
 | `frontdoor.telemetry.{audit,events}` | Silence the stderr audit/event channels in environments that pipe them elsewhere. |
 
 The rest are available but rarely needed in normal operation.

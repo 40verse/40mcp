@@ -45,10 +45,6 @@
     "./policy": {
       "types": "./src/security/policy.d.ts",
       "default": "./src/security/policy.js"
-    },
-    "./steering": {
-      "types": "./src/steering/index.d.ts",
-      "default": "./src/steering/index.js"
     }
   },
   "bin": {

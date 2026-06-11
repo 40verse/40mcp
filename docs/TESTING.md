@@ -104,7 +104,7 @@ The full set of allow / deny / `log_only` / `require_approval` cases
 lives in
 [`src/security/policy.test.js`](../src/security/policy.test.js), and
 the frontdoor integration in
-[`test/frontdoor-policy-tenant-steering.test.js`](../test/frontdoor-policy-tenant-steering.test.js).
+[`test/frontdoor-policy-tenant.test.js`](../test/frontdoor-policy-tenant.test.js).
 
 ## Standing up a fake stdio MCP upstream
 

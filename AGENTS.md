@@ -25,8 +25,7 @@ src/
 ├── webhook/         Webhook ingestion
 ├── tenant/          Multi-tenant scoping
 ├── security/        Sealed vault, policy gates, invariant tests
-├── red-team/        Adversarial + fuzzing test suite
-└── steering/        Steering directives
+└── red-team/        Adversarial + fuzzing test suite
 
 test/                Integration tests (emulate-compatible)
 configs/             Community API configs (browse directory for current count)

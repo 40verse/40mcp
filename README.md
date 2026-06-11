@@ -122,7 +122,6 @@ npm install -g 40mcp@beta     # or: npx 40mcp@beta <command>
 | **Sealed vault** | AES-256-GCM envelope encryption for API keys |
 | **Policy gates** | Human-in-the-loop approval for dangerous actions |
 | **MCP linking** | Connect to existing MCP servers, re-expose with policy gates |
-| **Steering** (`40mcp/steering`) | Forced-inference write classification for agent memory tools |
 | **AI generation (LLM prompt)** | Describe an API → get a prompt pair for any LLM |
 
 See [SPEC.md](SPEC.md) for the full contract and non-goals.

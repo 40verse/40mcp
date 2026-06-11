@@ -145,7 +145,6 @@ genuinely wants its own process lifecycle.
 | `--bearer-file <path>` | Multi-token auth: JSON `{ principal: token }`. Each principal can be revoked independently; successful auth events carry the principal name. |
 | `--max-sessions-per-principal <N>` | Concurrent SSE session cap per principal in multi-token mode (default `5`). Composes with the per-IP cap. |
 | `--policy <path>` | Policy gate — JSON `{ toolPolicies: { "<tool>": "allow\|deny\|log_only\|require_approval" }, ... }`. Runs before the upstream dispatch. Embedded `tool.policy` annotations on linked tools are also honored when `--policy` is passed (even pointing at an empty `{}` file). |
-| `--steering <path>` | Per-tool steering config — JSON `{ "<tool>": { prehook, posthook, ... } }`. Merged onto the tool definition. |
 | `--tenant-map <path>` | Per-principal tenant scope — JSON `{ "<principal>": { tenantId, allowlist?, blocklist? } }`. Requires `--bearer-file`. |
 | `--allowed-origin <o[,o2]>` | Comma-separated CORS origins. Only needed for browser clients; non-browser MCP clients do not send `Origin`. |
 | `--only <a,b>` / `--skip <a,b>` | Filter which upstream *servers* to connect. |
@@ -272,10 +271,10 @@ Those are workload-governance concerns and belong to the broader
 authority-boundary work. Session cap is the right
 first knob; the rest can layer on top without changing the shape.
 
-## Authority boundary: policy, steering, tenant
+## Authority boundary: policy, tenant
 
 The frontdoor is more than a transport — it's the publication boundary
-for a set of private upstreams. Three knobs shape what the published
+for a set of private upstreams. Two knobs shape what the published
 surface actually *does* on a per-call basis:
 
 ### `--policy <path>` — deny dangerous tools at the frontdoor
@@ -314,27 +313,6 @@ so the policy module's `require_approval` verdict is treated as
 asynchronous approval channel (webhook, Slack, PagerDuty) is a named
 follow-up.
 
-### `--steering <path>` — add prehook / posthook instructions to tools
-
-Steering lets the frontdoor add agent-directed instructions around a
-tool call without the upstream knowing. The file is a per-tool spec
-merged onto the linked tool definitions:
-
-```json
-{
-  "github.create_issue": {
-    "prehook":  "Confirm the issue matches an existing problem, don't create duplicates",
-    "posthook": "Report the new issue URL to the operator in the next turn"
-  }
-}
-```
-
-Result payloads from tools with steering config are wrapped with a
-`_steering` envelope carrying the instructions; tools without steering
-return their raw result unchanged. The existing `runPrehook` /
-`runPosthook` / `attachSteeringEnvelope` machinery drives this — the
-frontdoor just plumbs the config in.
-
 ### `--tenant-map <path>` — bind a tenant scope per principal
 
 When the frontdoor is authenticated via `--bearer-file`, each inbound
@@ -369,8 +347,7 @@ client → policy gate → tenant scope → raw dispatch → upstream MCP server
 
 Policy runs first (coarse allow/deny at the frontdoor), tenant next
 (per-principal allowlist/blocklist, tenant metadata injection), then
-raw dispatch hits the upstream. Steering runs *around* this stack on
-the request and response, wrapping the final result payload.
+raw dispatch hits the upstream.
 
 ### Interaction with `--allow-tool` / `--deny-tool`
 

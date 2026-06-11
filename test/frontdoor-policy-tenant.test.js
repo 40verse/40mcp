@@ -1,14 +1,15 @@
 /**
- * Frontdoor policy / steering / tenant scope.
+ * Frontdoor policy / tenant scope.
  *
- * Spawns a `40mcp link --sse ...` frontdoor with each of `--policy`,
- * `--steering`, `--tenant-map` and verifies that the linked surface is
- * shaped accordingly. Also exercises the AsyncLocalStorage principal
- * threading that lands `principal` + `sessionId` on `frontdoor.tool_call`.
+ * Spawns a `40mcp link --sse ...` frontdoor with each of `--policy` and
+ * `--tenant-map` and verifies that the linked surface is shaped
+ * accordingly. Also exercises the AsyncLocalStorage principal threading
+ * that lands `principal` + `sessionId` on `frontdoor.tool_call`, and the
+ * loud-failure path for the removed `--steering` flag.
  *
  * Tool calls are made over the published SSE endpoint using the MCP SDK's
- * SSE client, so the full transport → ALS → steering → policy → tenant →
- * dispatch chain is covered end-to-end.
+ * SSE client, so the full transport → ALS → policy → tenant → dispatch
+ * chain is covered end-to-end.
  */
 
 import { describe, it, before, after } from 'node:test';
@@ -213,17 +214,14 @@ describe('frontdoor --policy', () => {
   });
 });
 
-// ─── Steering ────────────────────────────────────────────────────────────
+// ─── Steering (removed) ──────────────────────────────────────────────────
 
-describe('frontdoor --steering', () => {
-  it('attaches _steering envelope with prehook/posthook instructions', async () => {
+describe('frontdoor --steering (removed feature)', () => {
+  it('exits with a removal error instead of silently ignoring the flag', async () => {
     const port = await pickFreePort();
     const steeringFile = resolve(__dirname, '_frontdoor-steering.json');
     await writeFile(steeringFile, JSON.stringify({
-      'upstream.ping': {
-        prehook: 'Confirm ping target is intended',
-        posthook: 'Report pong latency to the operator',
-      },
+      'upstream.ping': { prehook: 'X' },
     }));
 
     const proc = spawn('node', [
@@ -234,56 +232,17 @@ describe('frontdoor --steering', () => {
       '--steering', steeringFile,
     ], { stdio: ['ignore', 'pipe', 'pipe'] });
     proc.stdout.on('data', () => {});
-    proc.stderr.on('data', () => {});
+    let stderr = '';
+    proc.stderr.on('data', (d) => { stderr += d; });
 
-    let client; let transport;
     try {
-      await waitForPort(port);
-      ({ client, transport } = await connectClient(port, 'steer-tok'));
-
-      const res = await client.callTool({ name: 'upstream.ping', arguments: {} });
-      assert.ok(res.content && res.content[0], 'expected content');
-      // The steering envelope is JSON-stringified into the text block.
-      const text = res.content[0].text;
-      assert.ok(/_steering/.test(text), `expected _steering envelope, got: ${text.slice(0, 300)}`);
-      assert.ok(/Confirm ping target/.test(text));
-      assert.ok(/Report pong latency/.test(text));
+      const exitCode = await new Promise((done) => proc.once('exit', done));
+      assert.equal(exitCode, 1, `expected exit 1, got ${exitCode}; stderr:\n${stderr.slice(-800)}`);
+      assert.ok(
+        /--steering is no longer supported/.test(stderr),
+        `expected removal message, got:\n${stderr.slice(-800)}`,
+      );
     } finally {
-      try { await transport?.close(); } catch { /* ignore */ }
-      try { await client?.close(); } catch { /* ignore */ }
-      await killProc(proc);
-      await rm(steeringFile, { force: true });
-    }
-  });
-
-  it('a tool without steering config still returns a bare payload (no envelope)', async () => {
-    const port = await pickFreePort();
-    // Steering file configured only for `ping`, not for `echo`.
-    const steeringFile = resolve(__dirname, '_frontdoor-steering-partial.json');
-    await writeFile(steeringFile, JSON.stringify({
-      'upstream.ping': { prehook: 'X' },
-    }));
-
-    const proc = spawn('node', [
-      cliPath, 'link', frontdoorCfg,
-      '--sse', String(port),
-      '--host', '127.0.0.1',
-      '--require-bearer', 'steer2-tok',
-      '--steering', steeringFile,
-    ], { stdio: ['ignore', 'pipe', 'pipe'] });
-    proc.stdout.on('data', () => {});
-    proc.stderr.on('data', () => {});
-
-    let client; let transport;
-    try {
-      await waitForPort(port);
-      ({ client, transport } = await connectClient(port, 'steer2-tok'));
-      const res = await client.callTool({ name: 'upstream.echo', arguments: {} });
-      const text = res.content[0].text;
-      assert.ok(!/_steering/.test(text), `echo should not carry _steering, got: ${text.slice(0, 200)}`);
-    } finally {
-      try { await transport?.close(); } catch { /* ignore */ }
-      try { await client?.close(); } catch { /* ignore */ }
       await killProc(proc);
       await rm(steeringFile, { force: true });
     }

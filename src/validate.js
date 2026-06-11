@@ -5,13 +5,11 @@
  */
 
 import { BridgeError, BridgeErrorCode } from './errors.js';
-import { hasPromptInjection } from './core/sanitize.js';
 
 const VALID_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 const VALID_AUTH_TYPES = new Set(['header', 'bearer', 'basic', 'oauth2', 'sealed', 'sealed-bearer']);
 const VALID_TRANSPORT_TYPES = new Set(['stdio', 'sse']);
 const VALID_POLICY_VALUES = new Set(['allow', 'deny', 'require_approval', 'log_only']);
-const VALID_STEERING_KEYS = new Set(['write', 'prehook', 'posthook', 'authority']);
 const TOOL_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 const PATH_PARAM_PATTERN = /:([a-zA-Z_][a-zA-Z0-9_]*)/;
 
@@ -190,51 +188,14 @@ export function validateConfig(config) {
         warnings.push(`${prefix} "${tool.name}": missing description — AI agents need this to understand the tool`);
       }
 
-      // Steering — optional opt-in. If present, sanity-check shape only;
-      // the rich contract lives in src/steering/. This keeps validate.js
-      // dependency-free while still catching obvious typos.
+      // Steering was removed. Fail loudly rather than silently ignoring it:
+      // an operator who configured steering for write classification must not
+      // believe it is still being enforced.
       if (tool.steering !== undefined) {
-        if (typeof tool.steering !== 'object' || tool.steering === null || Array.isArray(tool.steering)) {
-          errors.push(`${prefix} "${tool.name}": steering must be an object`);
-        } else {
-          for (const key of Object.keys(tool.steering)) {
-            if (!VALID_STEERING_KEYS.has(key)) {
-              warnings.push(`${prefix} "${tool.name}": steering.${key} is not a recognized key. Known keys: ${[...VALID_STEERING_KEYS].join(', ')}`);
-            }
-          }
-          if (tool.steering.write !== undefined && typeof tool.steering.write !== 'boolean') {
-            errors.push(`${prefix} "${tool.name}": steering.write must be a boolean`);
-          }
-          for (const hookKey of ['prehook', 'posthook']) {
-            const hook = tool.steering[hookKey];
-            if (hook === undefined || hook === null) continue;
-            if (typeof hook !== 'string' && typeof hook !== 'object') {
-              errors.push(`${prefix} "${tool.name}": steering.${hookKey} must be a string or object`);
-            } else if (typeof hook === 'object' && typeof hook.instructions !== 'string') {
-              errors.push(`${prefix} "${tool.name}": steering.${hookKey}.instructions must be a string`);
-            }
-            // Scan the steering instruction text for prompt-injection patterns —
-            // steering strings flow into the LLM context as authoritative
-            // instructions, so a malicious community config can use them as
-            // a verbatim injection channel (steering scan).
-            const text = typeof hook === 'string' ? hook : hook?.instructions;
-            if (typeof text === 'string' && hasPromptInjection(text)) {
-              errors.push(
-                `${prefix} "${tool.name}": steering.${hookKey} contains prompt-injection pattern — ` +
-                `steering text is rendered into the agent's context window verbatim and must not contain ` +
-                `instructions that override prior context.`,
-              );
-            }
-          }
-          if (tool.steering.authority !== undefined && tool.steering.authority !== null) {
-            const auth = tool.steering.authority;
-            if (typeof auth !== 'string' && typeof auth !== 'object') {
-              errors.push(`${prefix} "${tool.name}": steering.authority must be a preset name (string) or an inline spec (object)`);
-            } else if (typeof auth === 'object' && !Array.isArray(auth.allowed_memory_types)) {
-              errors.push(`${prefix} "${tool.name}": steering.authority.allowed_memory_types must be an array`);
-            }
-          }
-        }
+        errors.push(
+          `${prefix} "${tool.name}": "steering" is no longer supported — the steering module was removed. ` +
+          `Remove the steering block from this tool, or pin 40mcp to 0.1.x.`,
+        );
       }
     }
   }

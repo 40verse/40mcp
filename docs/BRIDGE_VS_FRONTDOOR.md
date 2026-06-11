@@ -64,7 +64,7 @@ The separation is the point:
 - **Upstream bridges** hold credentials and execute tools.
 - **The frontdoor** owns publication, namespace, and inbound access. It does not hold upstream credentials.
 
-**Settings:** `frontdoor.*` controls transport, bearer/multi-token auth, SSE session caps, tool surface filters, policy/tenant/steering paths, and telemetry.
+**Settings:** `frontdoor.*` controls transport, bearer/multi-token auth, SSE session caps, tool surface filters, policy/tenant paths, and telemetry.
 
 See [FRONTDOOR.md](FRONTDOOR.md) for deployment patterns and auth modes.
 

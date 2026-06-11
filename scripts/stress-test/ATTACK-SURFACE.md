@@ -122,4 +122,4 @@ Documented gaps, to be added in follow-up passes:
 4. **Vault daemon** — AES-256-GCM envelope crypto, JIT token retrieval. No probes yet for key rotation or replay across sessions.
 5. **Policy gate** — human-in-the-loop approver. Worth modeling a hostile approver that always denies.
 6. **Multi-tenant scope** — cross-tenant dispatch isolation with a shared dispatch cap.
-7. **Steering** — probe that smuggles prompt injection via steering classification / instruction strip.
+7. **Reserved envelope keys** — probes that forge `_steering` / `_tenant` / `_chain` envelopes and verify they are stripped at every boundary. (`_steering` is a reserved key retained from the removed steering module.)

@@ -92,20 +92,11 @@ AuditEventCode               Frozen enum of audit-log event names
 
 Transport exports (from `40mcp/transport`): `createStdioTransport`, `createSseTransport`, `createTransport`.
 
-Subpath exports published in `package.json` `exports`: `./loaders`, `./compose`, `./transport`, `./reverse`, `./transforms`, `./webhook`, `./tenant`, `./security`, `./policy`, `./steering`.
+Subpath exports published in `package.json` `exports`: `./loaders`, `./compose`, `./transport`, `./reverse`, `./transforms`, `./webhook`, `./tenant`, `./security`, `./policy`.
 
-### Steering module (`40mcp/steering`)
+### Steering module (removed)
 
-The steering module provides a forced-inference write-classification surface for agent memory systems. It is orthogonal to the bridge and is not required to use 40mcp. Schema and hook surface may change between minor releases pre-1.0.
-
-```
-applySteering(), classifyWrite(), deriveDecayPolicy()
-runPrehook(), runPosthook(), attachSteeringEnvelope()
-Authority, AUTHORITIES, resolveAuthority(), checkAuthority()
-AgenticMemory, createAgenticMemory(), RELEASE_OUTCOMES
-MEMORY_TYPES, CONFIDENCE_RANGE, IMPORTANCE_RANGE,
-DECAY_POLICIES, STEERING_WRITE_REQUIRED_FIELDS
-```
+The steering module (`40mcp/steering` — forced-inference write classification for agent memory systems) was removed pre-1.0. It was orthogonal to the bridge by its own definition and widened the 1.0 surface without a consuming use case. The `_steering` envelope key remains **reserved** (see below) so no operator or upstream can shadow it and a future external steering package can reclaim it without a breaking envelope change. Configs that still carry `tool.steering`, the `--steering` flag, or `settings.frontdoor.steering` fail validation with a removal message rather than being silently ignored.
 
 ### Reserved envelope keys
 
@@ -168,7 +159,7 @@ interface Transform {
 }
 ```
 
-All three methods are optional; most transforms implement only one. Policy gates, tenant scope, and steering envelope attachment are expressible as Transforms.
+All three methods are optional; most transforms implement only one. Policy gates and tenant scope are expressible as Transforms.
 
 ### Hook taxonomy
 
@@ -257,9 +248,8 @@ Everything else is Node.js built-ins (`node:http`, `node:crypto`, `node:fs`, etc
 
 All surfaces documented in §2 are functional and covered by the test suite. Until a `1.0.0` release, this project follows pre-1.0 semver: minor version bumps may include breaking changes; patch versions are backwards-compatible fixes.
 
-Two modules carry an explicit "may change between minor releases" caveat pre-1.0:
+One module carries an explicit "may change between minor releases" caveat pre-1.0:
 
-- **Steering module (`40mcp/steering`)** — Schema and hook surface may evolve.
 - **AI generation — prompt mode (`generatePrompt`)** — Prompt format is not locked.
 
 Everything else is intended to remain interface-compatible across minor releases pre-1.0 where practical, and may gain new options.
