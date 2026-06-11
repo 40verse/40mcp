@@ -100,7 +100,7 @@ The steering module (`40mcp/steering` — forced-inference write classification 
 
 ### Reserved envelope keys
 
-The bridge reserves a set of envelope key names that operators must not emit on tool result payloads. Every reserved key is stripped on all egress paths (MCP `CallToolRequestSchema`, mixer `CallToolRequestSchema`, bridge `dispatch()`, reverse bridge REST egress, webhook sync response) via the shared `stripInternalEnvelopes` / `stripEgressEnvelopes` / `sanitizeTransportEgress` walkers in `src/bridge.js`.
+The bridge reserves a set of envelope key names that operators must not emit on tool result payloads. Every reserved key is stripped on all egress paths (MCP `CallToolRequestSchema`, mixer `CallToolRequestSchema`, bridge `dispatch()`, reverse bridge REST egress, webhook sync response) via the shared `stripInternalEnvelopes` / `stripEgressEnvelopes` / `sanitizeTransportEgress` walkers in `src/core/envelope.js` — the single registry for reserved keys and strip walkers. Adding a key to `RESERVED_ARG_KEYS` there is sufficient: every dispatch surface (bridge, mixer, linked upstreams, webhook, reverse bridge) picks it up. `src/bridge.js` re-exports the names for backward compatibility.
 
 The following keys are **reserved — currently unused — will carry the listed metadata in a future minor**. Operators must not emit keys with these names; they are stripped on all egress paths so introducing the feature later cannot be confused with, or shadowed by, an operator- or upstream-emitted value.
 

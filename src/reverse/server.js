@@ -2,7 +2,8 @@ import { createServer } from 'node:http';
 import { URL } from 'node:url';
 import { timingSafeEqual, createHmac, randomBytes } from 'node:crypto';
 import { parseBody } from '../core/body.js';
-import { validateToolArgs, stripInternalEnvelopes, emitAuditLog } from '../bridge.js';
+import { validateToolArgs, emitAuditLog } from '../bridge.js';
+import { stripInternalEnvelopes } from '../core/envelope.js';
 import { safeLog } from '../core/events.js';
 import { BridgeError, BridgeErrorCode } from '../errors.js';
 
